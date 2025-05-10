@@ -466,10 +466,12 @@
                 return;
             }
 
+            console.log('Uploading files:', files.length);
             showLoading();
             const formData = new FormData();
             for (let i = 0; i < files.length; i++) {
                 formData.append('files', files[i]);
+                console.log('Added file:', files[i].name);
             }
 
             fetch('/upload', {
@@ -477,14 +479,17 @@
                 body: formData
             })
             .then(response => {
+                console.log('Upload response status:', response.status);
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
                 return response.json();
             })
             .then(data => {
+                console.log('Upload response:', data);
                 if (data.success) {
                     uploadedFiles = data.files;
+                    console.log('Files uploaded successfully:', uploadedFiles);
                     currentImageIndex = 0;
                     updateImageCounter();
                     loadImage(currentImageIndex);
@@ -494,7 +499,7 @@
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error in file upload:', error);
                 alert('Error uploading files: ' + error.message);
             })
             .finally(() => {
@@ -510,9 +515,17 @@
                 const windowCenter = document.getElementById('window-center').value;
                 const rotation = document.getElementById('rotation').value;
                 
+                console.log('Loading image:', {
+                    index: index,
+                    windowWidth: windowWidth,
+                    windowCenter: windowCenter,
+                    rotation: rotation,
+                    totalFiles: uploadedFiles.length
+                });
+
                 // Add error handling for image loading
-                img.onerror = function() {
-                    console.error('Error loading image');
+                img.onerror = function(e) {
+                    console.error('Error loading image:', e);
                     alert('Error loading image. Please try again.');
                     hideLoading();
                 };
@@ -520,20 +533,31 @@
                 // Add timestamp to prevent caching
                 const timestamp = new Date().getTime();
                 const imageUrl = `/get_image/${index}?window_width=${windowWidth}&window_center=${windowCenter}&rotation=${rotation}&t=${timestamp}`;
-                console.log('Loading image:', imageUrl);
+                console.log('Fetching image from:', imageUrl);
 
                 // Fetch the image data
                 fetch(imageUrl)
                     .then(response => {
+                        console.log('Response status:', response.status);
                         if (!response.ok) {
-                            throw new Error('Network response was not ok');
+                            throw new Error(`HTTP error! status: ${response.status}`);
                         }
                         return response.json();
                     })
                     .then(data => {
+                        console.log('Received data:', {
+                            success: data.success,
+                            hasImage: !!data.image,
+                            imageLength: data.image ? data.image.length : 0
+                        });
+                        
                         if (data.success && data.image) {
-                            img.src = 'data:image/png;base64,' + data.image;
+                            const base64Image = 'data:image/png;base64,' + data.image;
+                            console.log('Setting image source, length:', base64Image.length);
+                            img.src = base64Image;
+                            
                             img.onload = function() {
+                                console.log('Image loaded successfully');
                                 hideLoading();
                                 updateImageCounter();
                                 resizeCanvas();
@@ -545,10 +569,12 @@
                         }
                     })
                     .catch(error => {
-                        console.error('Error:', error);
+                        console.error('Error in image loading:', error);
                         alert('Error loading image: ' + error.message);
                         hideLoading();
                     });
+            } else {
+                console.error('Invalid image index:', index);
             }
         }
 

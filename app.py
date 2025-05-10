@@ -176,8 +176,10 @@ def get_dicom_image(dicom_file, window_center=None, window_width=None, rotation=
         image = ds.pixel_array
         
         # Print debug information
+        print(f"Processing DICOM file: {dicom_file}")
         print(f"Image shape: {image.shape}")
         print(f"Image dtype: {image.dtype}")
+        print(f"Window Center: {window_center}, Window Width: {window_width}")
         
         # Handle different data types and shapes
         if image.dtype == np.uint8:
@@ -209,6 +211,10 @@ def get_dicom_image(dicom_file, window_center=None, window_width=None, rotation=
         if len(image.shape) > 2:
             image = image.reshape(image.shape[0], -1)
         
+        print(f"Processed image shape: {image.shape}")
+        print(f"Processed image dtype: {image.dtype}")
+        print(f"Processed image min: {image.min()}, max: {image.max()}")
+        
         # Convert to PIL Image
         pil_image = Image.fromarray(image)
         
@@ -221,6 +227,7 @@ def get_dicom_image(dicom_file, window_center=None, window_width=None, rotation=
         pil_image.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode()
         
+        print(f"Generated base64 string length: {len(img_str)}")
         return img_str
         
     except Exception as e:
@@ -419,19 +426,25 @@ def get_image(index):
         window_center = request.args.get('window_center', type=float)
         rotation = request.args.get('rotation', type=float, default=0)
         
+        print(f"Requested image {index} with window_width={window_width}, window_center={window_center}, rotation={rotation}")
+        
         # Get the list of uploaded files
         uploaded_files = glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], '*'))
         if not uploaded_files:
+            print("No files found in upload folder")
             return jsonify({'error': 'No files uploaded'}), 404
         
         # Sort files to ensure consistent order
         uploaded_files.sort()
+        print(f"Found {len(uploaded_files)} files in upload folder")
         
         if index < 0 or index >= len(uploaded_files):
+            print(f"Invalid index {index} for {len(uploaded_files)} files")
             return jsonify({'error': 'Invalid image index'}), 404
         
         # Get the DICOM file
         dicom_file = uploaded_files[index]
+        print(f"Processing file: {dicom_file}")
         
         # Process the DICOM file
         try:
