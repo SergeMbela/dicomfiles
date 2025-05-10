@@ -254,8 +254,10 @@
 
         function resizeCanvas() {
             const img = document.getElementById('dicomImage');
-            canvas.width = img.width;
-            canvas.height = img.height;
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            canvas.style.width = img.width + 'px';
+            canvas.style.height = img.height + 'px';
         }
 
         // Window/Level presets
@@ -285,7 +287,12 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     uploadedFiles = data.files;
@@ -294,13 +301,14 @@
                     loadImage(currentImageIndex);
                     updateNavigationButtons();
                 } else {
-                    alert('Error uploading files: ' + data.error);
+                    throw new Error(data.error || 'Error uploading files');
                 }
-                hideLoading();
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error uploading files');
+                alert('Error uploading files: ' + error.message);
+            })
+            .finally(() => {
                 hideLoading();
             });
         }
@@ -313,13 +321,23 @@
                 const windowCenter = document.getElementById('window-center').value;
                 const rotation = document.getElementById('rotation').value;
                 
-                img.src = `/get_image/${index}?window_width=${windowWidth}&window_center=${windowCenter}&rotation=${rotation}&t=${new Date().getTime()}`;
-                img.onload = () => {
+                // Add error handling for image loading
+                img.onerror = function() {
+                    console.error('Error loading image');
+                    alert('Error loading image. Please try again.');
+                    hideLoading();
+                };
+
+                img.onload = function() {
                     hideLoading();
                     updateImageCounter();
                     resizeCanvas();
                     redrawMeasurements();
                 };
+
+                // Add timestamp to prevent caching
+                const timestamp = new Date().getTime();
+                img.src = `/get_image/${index}?window_width=${windowWidth}&window_center=${windowCenter}&rotation=${rotation}&t=${timestamp}`;
             }
         }
 
@@ -358,7 +376,11 @@
 
         function updateImageCounter() {
             const counter = document.getElementById('image-counter');
-            counter.textContent = `Image ${currentImageIndex + 1} of ${uploadedFiles.length}`;
+            if (uploadedFiles.length > 0) {
+                counter.textContent = `Image ${currentImageIndex + 1} of ${uploadedFiles.length}`;
+            } else {
+                counter.textContent = 'No images loaded';
+            }
         }
 
         function updateNavigationButtons() {
@@ -369,47 +391,60 @@
             nextButton.disabled = currentImageIndex === uploadedFiles.length - 1;
         }
 
+        // Add keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (uploadedFiles.length > 0) {
+                if (e.key === 'ArrowLeft') {
+                    previousImage();
+                } else if (e.key === 'ArrowRight') {
+                    nextImage();
+                }
+            }
+        });
+
+        // Add error handling for image loading
+        window.addEventListener('error', function(e) {
+            if (e.target.tagName === 'IMG') {
+                console.error('Image loading error:', e);
+                alert('Error loading image. Please try again.');
+                hideLoading();
+            }
+        }, true);
+
+        // Add loading state management
         function showLoading() {
-            document.getElementById('loadingOverlay').style.display = 'flex';
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+            }
         }
 
         function hideLoading() {
-            document.getElementById('loadingOverlay').style.display = 'none';
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
         }
+
+        // Initialize the viewer
+        function initViewer() {
+            updateImageCounter();
+            updateNavigationButtons();
+            initCanvas();
+        }
+
+        // Call initViewer when the page loads
+        window.addEventListener('load', initViewer);
 
         function toggleMeasurementTools() {
             const tools = document.getElementById('measurementTools');
             tools.classList.toggle('active');
         }
 
-        function startDistanceMeasurement() {
-            isMeasuring = true;
-            measurementType = 'distance';
-            measurementPoints = [];
-            canvas.style.pointerEvents = 'auto';
-            canvas.addEventListener('click', handleMeasurementClick);
-        }
-
-        function startAreaMeasurement() {
-            isMeasuring = true;
-            measurementType = 'area';
-            measurementPoints = [];
-            canvas.style.pointerEvents = 'auto';
-            canvas.addEventListener('click', handleMeasurementClick);
-        }
-
-        function startAngleMeasurement() {
-            isMeasuring = true;
-            measurementType = 'angle';
-            measurementPoints = [];
-            canvas.style.pointerEvents = 'auto';
-            canvas.addEventListener('click', handleMeasurementClick);
-        }
-
         function handleMeasurementClick(e) {
             const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / currentZoom;
-            const y = (e.clientY - rect.top) / currentZoom;
+            const x = (e.clientX - rect.left - translateX) / currentZoom;
+            const y = (e.clientY - rect.top - translateY) / currentZoom;
             
             measurementPoints.push({ x, y });
             
@@ -515,7 +550,7 @@
             
             if (measurementPoints.length > 0) {
                 const lastPoint = measurementPoints[measurementPoints.length - 1];
-                const mousePos = getMousePosition();
+                const mousePos = getMousePosition(event);
                 
                 ctx.beginPath();
                 ctx.moveTo(lastPoint.x, lastPoint.y);
@@ -571,8 +606,8 @@
         function getMousePosition(e) {
             const rect = canvas.getBoundingClientRect();
             return {
-                x: (e.clientX - rect.left) / currentZoom,
-                y: (e.clientY - rect.top) / currentZoom
+                x: (e.clientX - rect.left - translateX) / currentZoom,
+                y: (e.clientY - rect.top - translateY) / currentZoom
             };
         }
 
@@ -634,6 +669,7 @@
         function updateZoom() {
             const img = document.getElementById('dicomImage');
             img.style.transform = `scale(${currentZoom}) translate(${translateX}px, ${translateY}px)`;
+            canvas.style.transform = `scale(${currentZoom}) translate(${translateX}px, ${translateY}px)`;
         }
 
         function resetView() {
@@ -684,11 +720,99 @@
             }
         });
 
-        // Initialize buttons as disabled
-        updateNavigationButtons();
+        // Add right-click to cancel measurement
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (isMeasuring) {
+                finishMeasurement();
+                clearMeasurements();
+            }
+        });
 
-        // Initialize canvas when the page loads
-        window.addEventListener('load', initCanvas);
+        // Add double-click to finish area measurement
+        canvas.addEventListener('dblclick', (e) => {
+            if (isMeasuring && measurementType === 'area' && measurementPoints.length >= 3) {
+                drawAreaMeasurement();
+                measurements.push({
+                    type: 'area',
+                    points: [...measurementPoints]
+                });
+                finishMeasurement();
+            }
+        });
+
+        // Add touch support for mobile devices
+        canvas.addEventListener('touchstart', (e) => {
+            if (isMeasuring) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('click', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                handleMeasurementClick(mouseEvent);
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (isMeasuring) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('mousemove', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                drawMeasurementPreview(mouseEvent);
+            }
+        });
+
+        // Add measurement tooltips
+        function showTooltip(text, x, y) {
+            const tooltip = document.createElement('div');
+            tooltip.className = 'measurement-tooltip';
+            tooltip.textContent = text;
+            tooltip.style.position = 'absolute';
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+            tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+            tooltip.style.color = 'white';
+            tooltip.style.padding = '5px';
+            tooltip.style.borderRadius = '3px';
+            tooltip.style.fontSize = '12px';
+            tooltip.style.zIndex = '1000';
+            document.body.appendChild(tooltip);
+            
+            setTimeout(() => {
+                tooltip.remove();
+            }, 2000);
+        }
+
+        function startDistanceMeasurement() {
+            isMeasuring = true;
+            measurementType = 'distance';
+            measurementPoints = [];
+            canvas.style.pointerEvents = 'auto';
+            canvas.addEventListener('click', handleMeasurementClick);
+            showTooltip('Click two points to measure distance', 10, 10);
+        }
+
+        function startAreaMeasurement() {
+            isMeasuring = true;
+            measurementType = 'area';
+            measurementPoints = [];
+            canvas.style.pointerEvents = 'auto';
+            canvas.addEventListener('click', handleMeasurementClick);
+            showTooltip('Click three or more points to measure area. Double-click to finish.', 10, 10);
+        }
+
+        function startAngleMeasurement() {
+            isMeasuring = true;
+            measurementType = 'angle';
+            measurementPoints = [];
+            canvas.style.pointerEvents = 'auto';
+            canvas.addEventListener('click', handleMeasurementClick);
+            showTooltip('Click three points to measure angle', 10, 10);
+        }
     </script>
 </body>
 </html> 
