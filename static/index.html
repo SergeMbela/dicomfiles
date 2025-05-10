@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DICOM Viewer</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Simple DICOM Viewer</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
+            padding: 20px;
             background-color: #f0f0f0;
         }
         .container {
@@ -18,17 +17,21 @@
             background-color: white;
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .viewer-container {
+        .viewer {
             display: flex;
             gap: 20px;
             margin-top: 20px;
         }
-        .image-container {
+        .image-view {
             flex: 1;
-            text-align: center;
+            min-height: 600px;
+            background-color: #000;
             position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         .controls {
             width: 300px;
@@ -36,850 +39,301 @@
             background-color: #f8f8f8;
             border-radius: 8px;
         }
-        .image-display {
+        .dicom-image {
             max-width: 100%;
-            height: auto;
-            border: 1px solid #ddd;
-            margin-bottom: 10px;
-            cursor: move;
+            max-height: 100%;
+            display: none;
         }
-        .slider-container {
+        .dicom-image.loaded {
+            display: block;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .slider-group {
             margin: 15px 0;
         }
-        label {
+        .slider-group label {
             display: block;
             margin-bottom: 5px;
         }
-        input[type="range"] {
+        .slider-group input[type="range"] {
             width: 100%;
         }
-        .file-upload {
-            margin-bottom: 20px;
+        .slider-group .value {
+            text-align: right;
+            font-size: 14px;
+            color: #666;
         }
-        .nav-buttons {
+        .button-group {
             display: flex;
             gap: 10px;
-            justify-content: center;
-            margin-top: 10px;
+            margin-top: 20px;
         }
-        .image-counter {
-            margin: 10px 0;
-            text-align: center;
-            font-weight: bold;
-        }
-        .toolbar {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 5px;
-            border-radius: 5px;
-            display: flex;
-            gap: 5px;
-        }
-        .toolbar button {
-            padding: 5px 10px;
+        .button-group button {
+            flex: 1;
+            padding: 8px;
             border: none;
-            background: #007bff;
+            border-radius: 4px;
+            background-color: #007bff;
             color: white;
-            border-radius: 3px;
             cursor: pointer;
         }
-        .toolbar button:hover {
-            background: #0056b3;
+        .button-group button:hover {
+            background-color: #0056b3;
         }
-        .measurement-tools {
-            display: none;
-            position: absolute;
-            top: 50px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
-            border-radius: 5px;
+        .button-group button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
         }
-        .measurement-tools.active {
-            display: block;
+        .info-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+            font-size: 14px;
         }
-        .preset-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            margin-top: 10px;
+        .info-panel table {
+            width: 100%;
+            border-collapse: collapse;
         }
-        .preset-button {
-            flex: 1;
-            min-width: 80px;
-            padding: 5px;
-            font-size: 0.8em;
+        .info-panel td {
+            padding: 4px;
+            border-bottom: 1px solid #ddd;
         }
-        .zoom-controls {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 5px;
-            border-radius: 5px;
-            display: flex;
-            gap: 5px;
-        }
-        .loading-overlay {
-            display: none;
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.8);
-            justify-content: center;
-            align-items: center;
-        }
-        .loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .measurement-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            pointer-events: none;
+        .info-panel td:first-child {
+            color: #666;
+            width: 40%;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>DICOM Viewer</h1>
+        <h1>Simple DICOM Viewer</h1>
         
         <div class="file-upload">
             <input type="file" id="dicomFile" accept=".dcm,.dicom" multiple>
-            <button class="btn btn-primary" onclick="uploadFiles()">Upload DICOM Files</button>
+            <button onclick="uploadFiles()">Upload DICOM Files</button>
         </div>
 
-        <div class="viewer-container">
-            <div class="image-container">
-                <div class="toolbar">
-                    <button onclick="toggleMeasurementTools()"><i class="fas fa-ruler"></i></button>
-                    <button onclick="resetView()"><i class="fas fa-sync"></i></button>
-                    <button onclick="toggleFullscreen()"><i class="fas fa-expand"></i></button>
-                </div>
-                
-                <div class="measurement-tools" id="measurementTools">
-                    <button onclick="startDistanceMeasurement()">Distance</button>
-                    <button onclick="startAreaMeasurement()">Area</button>
-                    <button onclick="startAngleMeasurement()">Angle</button>
-                    <button onclick="clearMeasurements()">Clear</button>
-                </div>
-                
-                <div class="zoom-controls">
-                    <button onclick="zoomIn()"><i class="fas fa-search-plus"></i></button>
-                    <button onclick="zoomOut()"><i class="fas fa-search-minus"></i></button>
-                    <button onclick="resetZoom()"><i class="fas fa-compress"></i></button>
-                </div>
-                
-                <div class="loading-overlay" id="loadingOverlay">
-                    <div class="loading-spinner"></div>
-                </div>
-                
-                <canvas id="measurementCanvas" class="measurement-canvas"></canvas>
-                <img id="dicomImage" class="image-display" src="" alt="DICOM Image">
-                <div class="image-counter" id="image-counter">Image 0 of 0</div>
-                <div class="nav-buttons">
-                    <button class="btn btn-primary" id="prev-image" onclick="previousImage()">Previous</button>
-                    <button class="btn btn-primary" id="next-image" onclick="nextImage()">Next</button>
-                </div>
+        <div class="viewer">
+            <div class="image-view">
+                <img id="dicomImage" class="dicom-image" src="" alt="DICOM Image">
+                <div id="loading" class="loading" style="display: none;">Loading...</div>
+                <div id="error" class="error" style="display: none;"></div>
             </div>
             
             <div class="controls">
-                <h3>Image Controls</h3>
-                <div class="slider-container">
-                    <label for="window-width">Window Width:</label>
-                    <input type="range" id="window-width" min="1" max="4000" value="2000" onchange="updateWindowLevel()">
-                    <span id="window-width-value">2000</span>
+                <div class="slider-group">
+                    <label for="windowWidth">Window Width:</label>
+                    <input type="range" id="windowWidth" min="1" max="4000" value="2000">
+                    <div class="value" id="windowWidthValue">2000</div>
                 </div>
                 
-                <div class="slider-container">
-                    <label for="window-center">Window Center:</label>
-                    <input type="range" id="window-center" min="-1000" max="3000" value="1000" onchange="updateWindowLevel()">
-                    <span id="window-center-value">1000</span>
+                <div class="slider-group">
+                    <label for="windowCenter">Window Center:</label>
+                    <input type="range" id="windowCenter" min="-1000" max="3000" value="1000">
+                    <div class="value" id="windowCenterValue">1000</div>
                 </div>
                 
-                <div class="slider-container">
+                <div class="slider-group">
                     <label for="rotation">Rotation:</label>
-                    <input type="range" id="rotation" min="0" max="360" value="0" onchange="updateRotation()">
-                    <span id="rotation-value">0°</span>
+                    <input type="range" id="rotation" min="0" max="360" value="0">
+                    <div class="value" id="rotationValue">0°</div>
                 </div>
                 
-                <div class="preset-buttons">
-                    <button class="btn btn-secondary preset-button" onclick="applyPreset('lung')">Lung</button>
-                    <button class="btn btn-secondary preset-button" onclick="applyPreset('bone')">Bone</button>
-                    <button class="btn btn-secondary preset-button" onclick="applyPreset('brain')">Brain</button>
-                    <button class="btn btn-secondary preset-button" onclick="applyPreset('abdomen')">Abdomen</button>
+                <div class="button-group">
+                    <button onclick="previousImage()" id="prevButton" disabled>Previous</button>
+                    <button onclick="nextImage()" id="nextButton" disabled>Next</button>
                 </div>
                 
-                <div class="mt-3">
-                    <button id="view-info" class="btn btn-info w-100">View DICOM Info</button>
+                <div class="info-panel">
+                    <table>
+                        <tr><td>Patient ID</td><td id="patientId">-</td></tr>
+                        <tr><td>Study Date</td><td id="studyDate">-</td></tr>
+                        <tr><td>Modality</td><td id="modality">-</td></tr>
+                        <tr><td>Image Size</td><td id="imageSize">-</td></tr>
+                        <tr><td>Window Center</td><td id="infoWindowCenter">-</td></tr>
+                        <tr><td>Window Width</td><td id="infoWindowWidth">-</td></tr>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let currentImageIndex = 0;
         let uploadedFiles = [];
-        let currentZoom = 1;
-        let isPanning = false;
-        let startX, startY;
-        let translateX = 0;
-        let translateY = 0;
-        let isMeasuring = false;
-        let measurementType = null;
-        let measurementPoints = [];
-        let canvas, ctx;
-        let measurements = [];
-
-        // Initialize canvas
-        function initCanvas() {
-            canvas = document.getElementById('measurementCanvas');
-            if (!canvas) {
-                console.error('Canvas element not found');
-                return;
-            }
-            ctx = canvas.getContext('2d');
-            resizeCanvas();
-
-            // Add event listeners for measurements
-            canvas.addEventListener('mousemove', (e) => {
-                if (isMeasuring) {
-                    drawMeasurementPreview(e);
-                }
-            });
-
-            canvas.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                if (isMeasuring) {
-                    finishMeasurement();
-                    clearMeasurements();
-                }
-            });
-
-            canvas.addEventListener('dblclick', (e) => {
-                if (isMeasuring && measurementType === 'area' && measurementPoints.length >= 3) {
-                    drawAreaMeasurement();
-                    measurements.push({
-                        type: 'area',
-                        points: [...measurementPoints]
-                    });
-                    finishMeasurement();
-                }
-            });
-
-            // Add touch support for mobile devices
-            canvas.addEventListener('touchstart', (e) => {
-                if (isMeasuring) {
-                    e.preventDefault();
-                    const touch = e.touches[0];
-                    const mouseEvent = new MouseEvent('click', {
-                        clientX: touch.clientX,
-                        clientY: touch.clientY
-                    });
-                    handleMeasurementClick(mouseEvent);
-                }
-            });
-
-            canvas.addEventListener('touchmove', (e) => {
-                if (isMeasuring) {
-                    e.preventDefault();
-                    const touch = e.touches[0];
-                    const mouseEvent = new MouseEvent('mousemove', {
-                        clientX: touch.clientX,
-                        clientY: touch.clientY
-                    });
-                    drawMeasurementPreview(mouseEvent);
-                }
-            });
-        }
-
-        // Initialize the viewer
-        function initViewer() {
-            // Initialize canvas first
-            initCanvas();
-            
-            // Initialize UI state
-            updateImageCounter();
-            updateNavigationButtons();
-
-            // Add event listeners for window/level controls
-            const windowWidthInput = document.getElementById('window-width');
-            const windowCenterInput = document.getElementById('window-center');
-            const rotationInput = document.getElementById('rotation');
-
-            if (windowWidthInput) {
-                windowWidthInput.addEventListener('input', updateWindowLevel);
-            }
-            if (windowCenterInput) {
-                windowCenterInput.addEventListener('input', updateWindowLevel);
-            }
-            if (rotationInput) {
-                rotationInput.addEventListener('input', updateRotation);
-            }
-        }
-
-        // Loading state management
+        
         function showLoading() {
-            const overlay = document.getElementById('loadingOverlay');
-            if (overlay) {
-                overlay.style.display = 'flex';
-            }
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
         }
-
+        
         function hideLoading() {
-            const overlay = document.getElementById('loadingOverlay');
-            if (overlay) {
-                overlay.style.display = 'none';
-            }
+            document.getElementById('loading').style.display = 'none';
         }
-
-        // Call initViewer when the DOM is fully loaded
-        document.addEventListener('DOMContentLoaded', initViewer);
-
-        function resizeCanvas() {
-            const img = document.getElementById('dicomImage');
-            if (!img || !canvas) return;
-            
-            canvas.width = img.naturalWidth;
-            canvas.height = img.naturalHeight;
-            canvas.style.width = img.width + 'px';
-            canvas.style.height = img.height + 'px';
+        
+        function showError(message) {
+            const errorElement = document.getElementById('error');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
         }
-
-        function drawMeasurementPreview(e) {
-            if (!canvas || !ctx) return;
-            
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            redrawMeasurements();
-            
-            if (measurementPoints.length > 0) {
-                const lastPoint = measurementPoints[measurementPoints.length - 1];
-                const mousePos = getMousePosition(e);
-                
-                ctx.beginPath();
-                ctx.moveTo(lastPoint.x, lastPoint.y);
-                ctx.lineTo(mousePos.x, mousePos.y);
-                ctx.strokeStyle = '#00ff00';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            }
+        
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
         }
-
-        function getMousePosition(e) {
-            if (!canvas) return { x: 0, y: 0 };
+        
+        function updateControls() {
+            const prevButton = document.getElementById('prevButton');
+            const nextButton = document.getElementById('nextButton');
             
-            const rect = canvas.getBoundingClientRect();
-            return {
-                x: (e.clientX - rect.left - translateX) / currentZoom,
-                y: (e.clientY - rect.top - translateY) / currentZoom
-            };
+            prevButton.disabled = currentImageIndex === 0;
+            nextButton.disabled = currentImageIndex === uploadedFiles.length - 1;
         }
-
-        function startDistanceMeasurement() {
-            if (!canvas) return;
-            
-            isMeasuring = true;
-            measurementType = 'distance';
-            measurementPoints = [];
-            canvas.style.pointerEvents = 'auto';
-            canvas.addEventListener('click', handleMeasurementClick);
-            showTooltip('Click two points to measure distance', 10, 10);
-        }
-
-        function startAreaMeasurement() {
-            if (!canvas) return;
-            
-            isMeasuring = true;
-            measurementType = 'area';
-            measurementPoints = [];
-            canvas.style.pointerEvents = 'auto';
-            canvas.addEventListener('click', handleMeasurementClick);
-            showTooltip('Click three or more points to measure area. Double-click to finish.', 10, 10);
-        }
-
-        function startAngleMeasurement() {
-            if (!canvas) return;
-            
-            isMeasuring = true;
-            measurementType = 'angle';
-            measurementPoints = [];
-            canvas.style.pointerEvents = 'auto';
-            canvas.addEventListener('click', handleMeasurementClick);
-            showTooltip('Click three points to measure angle', 10, 10);
-        }
-
-        function finishMeasurement() {
-            if (!canvas) return;
-            
-            isMeasuring = false;
-            measurementType = null;
-            measurementPoints = [];
-            canvas.style.pointerEvents = 'none';
-            canvas.removeEventListener('click', handleMeasurementClick);
-        }
-
-        function clearMeasurements() {
-            if (!canvas || !ctx) return;
-            
-            measurements = [];
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-
-        function redrawMeasurements() {
-            if (!canvas || !ctx) return;
-            
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            measurements.forEach(measurement => {
-                if (measurement.type === 'distance') {
-                    measurementPoints = measurement.points;
-                    drawDistanceMeasurement();
-                } else if (measurement.type === 'area') {
-                    measurementPoints = measurement.points;
-                    drawAreaMeasurement();
-                } else if (measurement.type === 'angle') {
-                    measurementPoints = measurement.points;
-                    drawAngleMeasurement();
-                }
-            });
-        }
-
+        
         function uploadFiles() {
             const fileInput = document.getElementById('dicomFile');
             const files = fileInput.files;
             
             if (files.length === 0) {
-                alert('Please select DICOM files to upload');
+                showError('Please select DICOM files to upload');
                 return;
             }
-
-            console.log('Uploading files:', files.length);
+            
             showLoading();
+            hideError();
+            
             const formData = new FormData();
             for (let i = 0; i < files.length; i++) {
                 formData.append('files', files[i]);
-                console.log('Added file:', files[i].name);
             }
-
+            
             fetch('/upload', {
                 method: 'POST',
                 body: formData
             })
-            .then(response => {
-                console.log('Upload response status:', response.status);
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log('Upload response:', data);
                 if (data.success) {
                     uploadedFiles = data.files;
-                    console.log('Files uploaded successfully:', uploadedFiles);
                     currentImageIndex = 0;
-                    updateImageCounter();
                     loadImage(currentImageIndex);
-                    updateNavigationButtons();
                 } else {
                     throw new Error(data.error || 'Error uploading files');
                 }
             })
             .catch(error => {
-                console.error('Error in file upload:', error);
-                alert('Error uploading files: ' + error.message);
+                showError('Error uploading files: ' + error.message);
             })
             .finally(() => {
                 hideLoading();
             });
         }
-
+        
         function loadImage(index) {
-            if (index >= 0 && index < uploadedFiles.length) {
-                showLoading();
-                const img = document.getElementById('dicomImage');
-                const windowWidth = document.getElementById('window-width').value;
-                const windowCenter = document.getElementById('window-center').value;
-                const rotation = document.getElementById('rotation').value;
-                
-                console.log('Loading image:', {
-                    index: index,
-                    windowWidth: windowWidth,
-                    windowCenter: windowCenter,
-                    rotation: rotation,
-                    totalFiles: uploadedFiles.length
-                });
-
-                // Add error handling for image loading
-                img.onerror = function(e) {
-                    console.error('Error loading image:', e);
-                    alert('Error loading image. Please try again.');
-                    hideLoading();
-                };
-
-                // Add timestamp to prevent caching
-                const timestamp = new Date().getTime();
-                const imageUrl = `/get_image/${index}?window_width=${windowWidth}&window_center=${windowCenter}&rotation=${rotation}&t=${timestamp}`;
-                console.log('Fetching image from:', imageUrl);
-
-                // Fetch the image data
-                fetch(imageUrl)
-                    .then(response => {
-                        console.log('Response status:', response.status);
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('Received data:', {
-                            success: data.success,
-                            hasImage: !!data.image,
-                            imageLength: data.image ? data.image.length : 0
-                        });
-                        
-                        if (data.success && data.image) {
-                            const base64Image = 'data:image/png;base64,' + data.image;
-                            console.log('Setting image source, length:', base64Image.length);
-                            img.src = base64Image;
-                            
-                            img.onload = function() {
-                                console.log('Image loaded successfully');
-                                hideLoading();
-                                updateImageCounter();
-                                resizeCanvas();
-                                redrawMeasurements();
-                                updateNavigationButtons();
-                            };
-                        } else {
-                            throw new Error(data.error || 'Error loading image');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error in image loading:', error);
-                        alert('Error loading image: ' + error.message);
-                        hideLoading();
-                    });
-            } else {
-                console.error('Invalid image index:', index);
+            if (index < 0 || index >= uploadedFiles.length) {
+                return;
             }
-        }
-
-        function updateWindowLevel() {
-            const windowWidth = document.getElementById('window-width').value;
-            const windowCenter = document.getElementById('window-center').value;
             
-            document.getElementById('window-width-value').textContent = windowWidth;
-            document.getElementById('window-center-value').textContent = windowCenter;
-
-            loadImage(currentImageIndex);
-        }
-
-        function updateRotation() {
+            showLoading();
+            hideError();
+            
+            const windowWidth = document.getElementById('windowWidth').value;
+            const windowCenter = document.getElementById('windowCenter').value;
             const rotation = document.getElementById('rotation').value;
-            document.getElementById('rotation-value').textContent = rotation + '°';
             
-            loadImage(currentImageIndex);
+            const timestamp = new Date().getTime();
+            const imageUrl = `/get_image/${index}?window_width=${windowWidth}&window_center=${windowCenter}&rotation=${rotation}&t=${timestamp}`;
+            
+            fetch(imageUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.image) {
+                        const img = document.getElementById('dicomImage');
+                        img.src = 'data:image/png;base64,' + data.image;
+                        img.onload = function() {
+                            img.classList.add('loaded');
+                            if (data.metadata) {
+                                updateInfo(data.metadata);
+                            }
+                            updateControls();
+                            hideLoading();
+                        };
+                    } else {
+                        throw new Error(data.error || 'Error loading image');
+                    }
+                })
+                .catch(error => {
+                    showError('Error loading image: ' + error.message);
+                    hideLoading();
+                });
         }
-
+        
+        function updateInfo(metadata) {
+            document.getElementById('imageSize').textContent = `${metadata.image_size[0]}x${metadata.image_size[1]}`;
+            document.getElementById('infoWindowCenter').textContent = Math.round(metadata.window_center);
+            document.getElementById('infoWindowWidth').textContent = Math.round(metadata.window_width);
+            
+            fetch(`/info/${currentImageIndex}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data) {
+                        if (data.PatientInfo) {
+                            document.getElementById('patientId').textContent = data.PatientInfo.PatientID || '-';
+                        }
+                        if (data.StudyInfo) {
+                            document.getElementById('studyDate').textContent = data.StudyInfo.StudyDate || '-';
+                        }
+                        if (data.SeriesInfo) {
+                            document.getElementById('modality').textContent = data.SeriesInfo.Modality || '-';
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching DICOM info:', error);
+                });
+        }
+        
         function previousImage() {
             if (currentImageIndex > 0) {
                 currentImageIndex--;
                 loadImage(currentImageIndex);
-                updateNavigationButtons();
             }
         }
-
+        
         function nextImage() {
             if (currentImageIndex < uploadedFiles.length - 1) {
                 currentImageIndex++;
                 loadImage(currentImageIndex);
-                updateNavigationButtons();
             }
         }
-
-        function updateImageCounter() {
-            const counter = document.getElementById('image-counter');
-            if (uploadedFiles.length > 0) {
-                counter.textContent = `Image ${currentImageIndex + 1} of ${uploadedFiles.length}`;
-            } else {
-                counter.textContent = 'No images loaded';
-            }
-        }
-
-        function updateNavigationButtons() {
-            const prevButton = document.getElementById('prev-image');
-            const nextButton = document.getElementById('next-image');
-            
-            if (prevButton && nextButton) {
-                prevButton.disabled = currentImageIndex === 0;
-                nextButton.disabled = currentImageIndex === uploadedFiles.length - 1;
-            }
-        }
-
-        function toggleMeasurementTools() {
-            const tools = document.getElementById('measurementTools');
-            tools.classList.toggle('active');
-        }
-
-        function handleMeasurementClick(e) {
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left - translateX) / currentZoom;
-            const y = (e.clientY - rect.top - translateY) / currentZoom;
-            
-            measurementPoints.push({ x, y });
-            
-            if (measurementType === 'distance' && measurementPoints.length === 2) {
-                drawDistanceMeasurement();
-                measurements.push({
-                    type: 'distance',
-                    points: [...measurementPoints]
-                });
-                finishMeasurement();
-            } else if (measurementType === 'area' && measurementPoints.length >= 3) {
-                drawAreaMeasurement();
-                measurements.push({
-                    type: 'area',
-                    points: [...measurementPoints]
-                });
-                finishMeasurement();
-            } else if (measurementType === 'angle' && measurementPoints.length === 3) {
-                drawAngleMeasurement();
-                measurements.push({
-                    type: 'angle',
-                    points: [...measurementPoints]
-                });
-                finishMeasurement();
-            } else {
-                drawMeasurementPreview(e);
-            }
-        }
-
-        function drawDistanceMeasurement() {
-            const [p1, p2] = measurementPoints;
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = '#00ff00';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            
-            // Draw points
-            drawPoint(p1.x, p1.y);
-            drawPoint(p2.x, p2.y);
-            
-            // Calculate and display distance
-            const distance = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-            const midX = (p1.x + p2.x) / 2;
-            const midY = (p1.y + p2.y) / 2;
-            
-            ctx.fillStyle = '#00ff00';
-            ctx.font = '14px Arial';
-            ctx.fillText(`${distance.toFixed(2)}px`, midX, midY);
-        }
-
-        function drawAreaMeasurement() {
-            ctx.beginPath();
-            ctx.moveTo(measurementPoints[0].x, measurementPoints[0].y);
-            for (let i = 1; i < measurementPoints.length; i++) {
-                ctx.lineTo(measurementPoints[i].x, measurementPoints[i].y);
-            }
-            ctx.closePath();
-            ctx.strokeStyle = '#00ff00';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            
-            // Draw points
-            measurementPoints.forEach(point => drawPoint(point.x, point.y));
-            
-            // Calculate and display area
-            const area = calculatePolygonArea(measurementPoints);
-            const center = calculatePolygonCenter(measurementPoints);
-            
-            ctx.fillStyle = '#00ff00';
-            ctx.font = '14px Arial';
-            ctx.fillText(`${area.toFixed(2)}px²`, center.x, center.y);
-        }
-
-        function drawAngleMeasurement() {
-            const [p1, p2, p3] = measurementPoints;
-            
-            // Draw lines
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.lineTo(p3.x, p3.y);
-            ctx.strokeStyle = '#00ff00';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            
-            // Draw points
-            drawPoint(p1.x, p1.y);
-            drawPoint(p2.x, p2.y);
-            drawPoint(p3.x, p3.y);
-            
-            // Calculate and display angle
-            const angle = calculateAngle(p1, p2, p3);
-            ctx.fillStyle = '#00ff00';
-            ctx.font = '14px Arial';
-            ctx.fillText(`${angle.toFixed(1)}°`, p2.x, p2.y - 10);
-        }
-
-        function drawPoint(x, y) {
-            ctx.beginPath();
-            ctx.arc(x, y, 4, 0, 2 * Math.PI);
-            ctx.fillStyle = '#00ff00';
-            ctx.fill();
-        }
-
-        function calculatePolygonArea(points) {
-            let area = 0;
-            for (let i = 0; i < points.length; i++) {
-                const j = (i + 1) % points.length;
-                area += points[i].x * points[j].y;
-                area -= points[j].x * points[i].y;
-            }
-            return Math.abs(area / 2);
-        }
-
-        function calculatePolygonCenter(points) {
-            let x = 0, y = 0;
-            points.forEach(point => {
-                x += point.x;
-                y += point.y;
-            });
-            return {
-                x: x / points.length,
-                y: y / points.length
-            };
-        }
-
-        function calculateAngle(p1, p2, p3) {
-            const v1 = { x: p1.x - p2.x, y: p1.y - p2.y };
-            const v2 = { x: p3.x - p2.x, y: p3.y - p2.y };
-            
-            const dot = v1.x * v2.x + v1.y * v2.y;
-            const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
-            const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
-            
-            const cos = dot / (mag1 * mag2);
-            const angle = Math.acos(Math.max(-1, Math.min(1, cos)));
-            return angle * (180 / Math.PI);
-        }
-
-        function applyPreset(presetName) {
-            const preset = presets[presetName];
-            if (preset) {
-                document.getElementById('window-width').value = preset.width;
-                document.getElementById('window-center').value = preset.center;
-                updateWindowLevel();
-            }
-        }
-
-        function zoomIn() {
-            currentZoom *= 1.2;
-            updateZoom();
-        }
-
-        function zoomOut() {
-            currentZoom /= 1.2;
-            updateZoom();
-        }
-
-        function resetZoom() {
-            currentZoom = 1;
-            translateX = 0;
-            translateY = 0;
-            updateZoom();
-        }
-
-        function updateZoom() {
-            const img = document.getElementById('dicomImage');
-            img.style.transform = `scale(${currentZoom}) translate(${translateX}px, ${translateY}px)`;
-            canvas.style.transform = `scale(${currentZoom}) translate(${translateX}px, ${translateY}px)`;
-        }
-
-        function resetView() {
-            resetZoom();
-            document.getElementById('rotation').value = 0;
-            document.getElementById('window-width').value = 2000;
-            document.getElementById('window-center').value = 1000;
-            updateRotation();
-            updateWindowLevel();
-        }
-
-        function toggleFullscreen() {
-            const container = document.querySelector('.image-container');
-            if (!document.fullscreenElement) {
-                container.requestFullscreen();
-            } else {
-                document.exitFullscreen();
-            }
-        }
-
-        // Add event listeners for panning
-        document.getElementById('dicomImage').addEventListener('mousedown', (e) => {
-            if (currentZoom > 1) {
-                isPanning = true;
-                startX = e.clientX - translateX;
-                startY = e.clientY - translateY;
-            }
+        
+        // Add event listeners for controls
+        document.getElementById('windowWidth').addEventListener('input', function(e) {
+            document.getElementById('windowWidthValue').textContent = e.target.value;
+            loadImage(currentImageIndex);
         });
-
-        document.addEventListener('mousemove', (e) => {
-            if (isPanning) {
-                translateX = e.clientX - startX;
-                translateY = e.clientY - startY;
-                updateZoom();
-            }
+        
+        document.getElementById('windowCenter').addEventListener('input', function(e) {
+            document.getElementById('windowCenterValue').textContent = e.target.value;
+            loadImage(currentImageIndex);
         });
-
-        document.addEventListener('mouseup', () => {
-            isPanning = false;
+        
+        document.getElementById('rotation').addEventListener('input', function(e) {
+            document.getElementById('rotationValue').textContent = e.target.value + '°';
+            loadImage(currentImageIndex);
         });
-
-        // Add event listener for the info button
-        document.getElementById('view-info').addEventListener('click', function() {
-            if (uploadedFiles.length > 0) {
-                window.open(`/info/${currentImageIndex}`, '_blank');
-            } else {
-                alert('Please upload DICOM files first');
-            }
-        });
-
-        // Add measurement tooltips
-        function showTooltip(text, x, y) {
-            const tooltip = document.createElement('div');
-            tooltip.className = 'measurement-tooltip';
-            tooltip.textContent = text;
-            tooltip.style.position = 'absolute';
-            tooltip.style.left = x + 'px';
-            tooltip.style.top = y + 'px';
-            tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-            tooltip.style.color = 'white';
-            tooltip.style.padding = '5px';
-            tooltip.style.borderRadius = '3px';
-            tooltip.style.fontSize = '12px';
-            tooltip.style.zIndex = '1000';
-            document.body.appendChild(tooltip);
-            
-            setTimeout(() => {
-                tooltip.remove();
-            }, 2000);
-        }
     </script>
 </body>
 </html> 

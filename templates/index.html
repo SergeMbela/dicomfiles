@@ -5,131 +5,315 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DICOM Viewer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            padding: 20px;
+            text-align: center;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+        .drop-zone:hover {
+            border-color: #0d6efd;
+        }
+        .dicom-info {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .image-container {
+            max-width: 100%;
+            overflow: auto;
+            position: relative;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .dicom-image {
+            max-width: 100%;
+            height: auto;
+        }
+        .error-message {
+            text-align: center;
+            padding: 20px;
+            background: #f8d7da;
+            border: 1px solid #f5c2c7;
+            border-radius: 4px;
+            color: #842029;
+            margin: 10px 0;
+        }
+        .error-message i {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .error-message p {
+            margin: 0;
+        }
+        .error-message .error-details {
+            font-size: 14px;
+            margin-top: 10px;
+            color: #6c757d;
+        }
+        .frame-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            min-width: 300px;
+        }
+        .frame-controls button {
+            background: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            flex-shrink: 0;
+        }
+        .frame-controls button:hover {
+            background: #e9ecef;
+        }
+        .frame-controls button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .frame-controls button.active {
+            background: #0d6efd;
+            color: white;
+        }
+        .frame-counter {
+            color: white;
+            font-size: 14px;
+            min-width: 100px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .frame-slider {
+            flex-grow: 1;
+            min-width: 150px;
+        }
+        .frame-slider input[type="range"] {
+            width: 100%;
+            margin: 0;
+        }
+        .playback-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .playback-controls select {
+            background: white;
+            border: none;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 12px;
+        }
+        .file-list {
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .file-list .list-group-item {
+            cursor: pointer;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+        .file-list .list-group-item:hover {
+            background-color: #f8f9fa;
+        }
+        .file-list .list-group-item.active {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .file-list-controls {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .file-list-controls .search-box {
+            flex-grow: 1;
+        }
+        .file-list-controls .sort-controls {
+            display: flex;
+            gap: 5px;
+        }
+        .file-list-controls select {
+            font-size: 12px;
+            padding: 2px 8px;
+        }
+        .file-list-controls .btn-group {
+            display: flex;
+            gap: 5px;
+        }
+        .file-list-controls .btn {
+            padding: 2px 8px;
+            font-size: 12px;
+        }
+        .file-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .file-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-item-title {
+            font-weight: 500;
+        }
+        .file-item-date {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .file-item-details {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .file-item-tags {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+        .file-item-tag {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #495057;
+        }
+        /* Custom slider styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 5px;
+            background: #ddd;
+            border-radius: 5px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+    </style>
 </head>
 <body>
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
-        <div class="spinner-border text-light" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-    </div>
-
-    <div class="container-fluid mt-4">
+    <div class="container mt-4">
         <h1 class="text-center mb-4">DICOM Viewer</h1>
         
         <div class="row">
-            <div class="col-md-9">
+            <div class="col-md-6">
                 <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Upload DICOM File</h5>
+                    </div>
                     <div class="card-body">
-                        <div class="upload-section mb-4">
-                            <form id="uploadForm" class="mb-3">
-                                <div class="mb-3">
-                                    <label for="dicomFile" class="form-label">Upload DICOM Files</label>
-                                    <input type="file" class="form-control" id="dicomFile" accept=".dcm,.dicom,.dicomdir,DICOMDIR" multiple>
-                                    <div class="form-text">Supported formats: .dcm, .dicom, DICOMDIR</div>
-                                </div>
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-upload me-2"></i>Upload
-                                </button>
-                            </form>
+                        <div class="drop-zone" id="dropZone">
+                            <p class="mb-0">Drag and drop DICOM file or DICOMDIR here or click to select</p>
+                            <input type="file" id="fileInput" accept=".dcm,.dicom,DICOMDIR" style="display: none;">
                         </div>
-                        
-                        <div id="imageContainer" class="text-center" style="display: none;">
-                            <div class="image-wrapper">
-                                <img id="dicomImage" class="img-fluid" alt="DICOM Image">
-                            </div>
-                            
-                            <!-- Player Controls -->
-                            <div class="player-controls mt-4">
-                                <div class="player-main-controls">
-                                    <button class="btn btn-lg btn-secondary" onclick="previousImage()" id="prevBtn" title="Previous Image (←)">
-                                        <i class="fas fa-step-backward"></i>
-                                    </button>
-                                    <div class="player-info">
-                                        <span id="imageCounter" class="counter-text">Image 1 of 1</span>
-                                        <div class="slider-container">
-                                            <input type="range" class="form-range" id="imageSlider" min="0" value="0">
-                                        </div>
-                                    </div>
-                                    <button class="btn btn-lg btn-secondary" onclick="nextImage()" id="nextBtn" title="Next Image (→)">
-                                        <i class="fas fa-step-forward"></i>
-                                    </button>
+                        <div class="file-list" id="fileList" style="display: none;">
+                            <div class="file-list-controls">
+                                <div class="search-box">
+                                    <input type="text" class="form-control form-control-sm" id="searchInput" placeholder="Search files...">
                                 </div>
-                            </div>
-
-                            <!-- Image Controls -->
-                            <div class="controls mt-4">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="zoom-controls mb-3">
-                                            <h6>Zoom Controls</h6>
-                                            <div class="btn-group">
-                                                <button class="btn btn-secondary" onclick="zoomIn()" title="Zoom In (+)">
-                                                    <i class="fas fa-search-plus"></i> Zoom In
-                                                </button>
-                                                <button class="btn btn-secondary" onclick="zoomOut()" title="Zoom Out (-)">
-                                                    <i class="fas fa-search-minus"></i> Zoom Out
-                                                </button>
-                                                <button class="btn btn-secondary" onclick="resetZoom()" title="Reset Zoom (R)">
-                                                    <i class="fas fa-sync"></i> Reset
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div class="rotation-controls mb-3">
-                                            <h6>Rotation Controls</h6>
-                                            <div class="btn-group">
-                                                <button class="btn btn-secondary" onclick="rotateLeft()" title="Rotate Left ([)">
-                                                    <i class="fas fa-undo"></i> Rotate Left
-                                                </button>
-                                                <button class="btn btn-secondary" onclick="rotateRight()" title="Rotate Right (])">
-                                                    <i class="fas fa-redo"></i> Rotate Right
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="window-level-controls">
-                                            <h6>Window/Level Controls</h6>
-                                            <div class="preset-controls mb-3">
-                                                <div class="btn-group w-100">
-                                                    <button class="btn btn-outline-secondary" onclick="applyPreset('lung')">Lung</button>
-                                                    <button class="btn btn-outline-secondary" onclick="applyPreset('brain')">Brain</button>
-                                                    <button class="btn btn-outline-secondary" onclick="applyPreset('bone')">Bone</button>
-                                                    <button class="btn btn-outline-secondary" onclick="applyPreset('abdomen')">Abdomen</button>
-                                                </div>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="windowWidth" class="form-label">Window Width</label>
-                                                <input type="range" class="form-range" id="windowWidth" min="1" max="4000" value="2000">
-                                                <div class="d-flex justify-content-between">
-                                                    <span id="windowWidthValue">2000</span>
-                                                    <button class="btn btn-link" onclick="resetWindowLevel()">Reset</button>
-                                                </div>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="windowCenter" class="form-label">Window Center</label>
-                                                <input type="range" class="form-range" id="windowCenter" min="-1000" max="3000" value="1000">
-                                                <span id="windowCenterValue">1000</span>
-                                            </div>
-                                        </div>
+                                <div class="sort-controls">
+                                    <select class="form-select form-select-sm" id="sortField">
+                                        <option value="patient_name">Patient Name</option>
+                                        <option value="study_date">Study Date</option>
+                                        <option value="study_description">Study Description</option>
+                                        <option value="modality">Modality</option>
+                                    </select>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-secondary" id="sortAsc" title="Sort Ascending">
+                                            <i class="bi bi-sort-up"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" id="sortDesc" title="Sort Descending">
+                                            <i class="bi bi-sort-down"></i>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
+                            <div class="list-group">
+                                <!-- File list will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">DICOM Information</h5>
+                    </div>
+                    <div class="card-body dicom-info">
+                        <div id="dicomInfo">
+                            <p class="text-muted">Upload a DICOM file to view information</p>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <div class="col-md-3">
+            <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="card-title mb-0">DICOM Information</h5>
+                        <h5 class="card-title mb-0">DICOM Image</h5>
                     </div>
-                    <div class="card-body">
-                        <div id="dicomInfo" class="dicom-info">
-                            <p class="text-muted">Upload a DICOM file to view its information</p>
+                    <div class="card-body image-container">
+                        <div id="imageContainer">
+                            <p class="text-muted">Upload a DICOM file to view image</p>
+                        </div>
+                        <div class="frame-controls" style="display: none;">
+                            <button id="prevFrame" title="Previous Frame">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                            <button id="playPause" title="Play/Pause">
+                                <i class="bi bi-play-fill"></i>
+                            </button>
+                            <div class="frame-slider">
+                                <input type="range" id="frameSlider" min="0" value="0" step="1">
+                            </div>
+                            <span class="frame-counter">Frame 1 of 1</span>
+                            <button id="nextFrame" title="Next Frame">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                        <div class="playback-controls" style="display: none;">
+                            <select id="frameRate">
+                                <option value="1000">1 fps</option>
+                                <option value="500">2 fps</option>
+                                <option value="250">4 fps</option>
+                                <option value="125">8 fps</option>
+                                <option value="83">12 fps</option>
+                                <option value="62">16 fps</option>
+                                <option value="41">24 fps</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -138,6 +322,471 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const dicomInfo = document.getElementById('dicomInfo');
+        const imageContainer = document.getElementById('imageContainer');
+        const frameControls = document.querySelector('.frame-controls');
+        const prevFrameBtn = document.getElementById('prevFrame');
+        const nextFrameBtn = document.getElementById('nextFrame');
+        const frameCounter = document.querySelector('.frame-counter');
+        const frameSlider = document.getElementById('frameSlider');
+        const playPauseBtn = document.getElementById('playPause');
+        const frameRateSelect = document.getElementById('frameRate');
+        const playbackControls = document.querySelector('.playback-controls');
+        const fileList = document.getElementById('fileList');
+        const searchInput = document.getElementById('searchInput');
+        const sortField = document.getElementById('sortField');
+        const sortAsc = document.getElementById('sortAsc');
+        const sortDesc = document.getElementById('sortDesc');
+        
+        let currentFrame = 0;
+        let totalFrames = 1;
+        let currentFile = null;
+        let isSliderMoving = false;
+        let isPlaying = false;
+        let playInterval = null;
+        let currentFrameRate = 1000; // Default to 1 fps
+        let currentDicomDir = null;
+        let dicomDirFiles = [];
+        let currentSortField = 'patient_name';
+        let currentSortOrder = 'asc';
+
+        // Handle drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#0d6efd';
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#ccc';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#ccc';
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // Handle click to upload
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Search functionality
+        searchInput.addEventListener('input', () => {
+            filterAndDisplayFiles();
+        });
+
+        // Sort functionality
+        sortField.addEventListener('change', () => {
+            currentSortField = sortField.value;
+            filterAndDisplayFiles();
+        });
+
+        sortAsc.addEventListener('click', () => {
+            currentSortOrder = 'asc';
+            filterAndDisplayFiles();
+        });
+
+        sortDesc.addEventListener('click', () => {
+            currentSortOrder = 'desc';
+            filterAndDisplayFiles();
+        });
+
+        function filterAndDisplayFiles() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filteredFiles = dicomDirFiles.filter(file => {
+                return Object.values(file).some(value => 
+                    String(value).toLowerCase().includes(searchTerm)
+                );
+            });
+
+            const sortedFiles = sortFiles(filteredFiles);
+            displayDicomDirFiles(sortedFiles);
+        }
+
+        function sortFiles(files) {
+            return [...files].sort((a, b) => {
+                let valueA = a[currentSortField] || '';
+                let valueB = b[currentSortField] || '';
+
+                // Handle date sorting
+                if (currentSortField === 'study_date') {
+                    valueA = new Date(valueA);
+                    valueB = new Date(valueB);
+                } else {
+                    valueA = String(valueA).toLowerCase();
+                    valueB = String(valueB).toLowerCase();
+                }
+
+                if (valueA < valueB) return currentSortOrder === 'asc' ? -1 : 1;
+                if (valueA > valueB) return currentSortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        // Frame navigation
+        prevFrameBtn.addEventListener('click', () => {
+            if (currentFrame > 0) {
+                currentFrame--;
+                updateFrame();
+            }
+        });
+
+        nextFrameBtn.addEventListener('click', () => {
+            if (currentFrame < totalFrames - 1) {
+                currentFrame++;
+                updateFrame();
+            }
+        });
+
+        // Play/Pause functionality
+        playPauseBtn.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            if (isPlaying) {
+                playPauseBtn.innerHTML = '<i class="bi bi-pause-fill"></i>';
+                playPauseBtn.classList.add('active');
+                startPlayback();
+            } else {
+                playPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+                playPauseBtn.classList.remove('active');
+                stopPlayback();
+            }
+        });
+
+        // Frame rate control
+        frameRateSelect.addEventListener('change', () => {
+            currentFrameRate = parseInt(frameRateSelect.value);
+            if (isPlaying) {
+                stopPlayback();
+                startPlayback();
+            }
+        });
+
+        function startPlayback() {
+            stopPlayback(); // Clear any existing interval
+            playInterval = setInterval(() => {
+                if (currentFrame < totalFrames - 1) {
+                    currentFrame++;
+                } else {
+                    currentFrame = 0; // Loop back to start
+                }
+                updateFrame();
+            }, currentFrameRate);
+        }
+
+        function stopPlayback() {
+            if (playInterval) {
+                clearInterval(playInterval);
+                playInterval = null;
+            }
+        }
+
+        // Slider events
+        frameSlider.addEventListener('mousedown', () => {
+            isSliderMoving = true;
+            if (isPlaying) {
+                stopPlayback();
+                playPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+                playPauseBtn.classList.remove('active');
+                isPlaying = false;
+            }
+        });
+
+        frameSlider.addEventListener('mouseup', () => {
+            isSliderMoving = false;
+            currentFrame = parseInt(frameSlider.value);
+            updateFrame();
+        });
+
+        frameSlider.addEventListener('input', () => {
+            if (!isSliderMoving) {
+                currentFrame = parseInt(frameSlider.value);
+                updateFrame();
+            }
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' && currentFrame > 0) {
+                currentFrame--;
+                updateFrame();
+            } else if (e.key === 'ArrowRight' && currentFrame < totalFrames - 1) {
+                currentFrame++;
+                updateFrame();
+            } else if (e.key === ' ') { // Spacebar for play/pause
+                e.preventDefault();
+                playPauseBtn.click();
+            }
+        });
+
+        function updateFrame() {
+            if (!currentFile) return;
+
+            const formData = new FormData();
+            formData.append('file', currentFile);
+            formData.append('frame', currentFrame);
+
+            // Show loading state
+            imageContainer.innerHTML = '<p>Loading...</p>';
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.error) {
+                        displayError(data.error);
+                    } else {
+                        // Display image
+                        imageContainer.innerHTML = `<img src="data:image/png;base64,${data.image}" class="dicom-image" alt="DICOM Image">`;
+                        frameControls.style.display = 'flex';
+                        frameCounter.textContent = `Frame ${currentFrame + 1} of ${totalFrames}`;
+                        
+                        // Update slider
+                        frameSlider.value = currentFrame;
+                        
+                        // Update button states
+                        prevFrameBtn.disabled = currentFrame === 0;
+                        nextFrameBtn.disabled = currentFrame === totalFrames - 1;
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to process DICOM file');
+                }
+            })
+            .catch(error => {
+                displayError(error.message);
+            });
+        }
+
+        function handleFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Show loading state
+            dicomInfo.innerHTML = '<p>Loading...</p>';
+            imageContainer.innerHTML = '<p>Loading...</p>';
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.is_dicomdir) {
+                        // Handle DICOMDIR
+                        currentDicomDir = file;
+                        dicomDirFiles = data.files;
+                        filterAndDisplayFiles();
+                    } else {
+                        // Handle single DICOM file
+                        currentFile = file;
+                        displayDicomInfo(data.info);
+                        if (data.error) {
+                            displayError(data.error);
+                        } else {
+                            displayDicomImage(data);
+                        }
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to process file');
+                }
+            })
+            .catch(error => {
+                dicomInfo.innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+                displayError(error.message);
+                frameControls.style.display = 'none';
+                playbackControls.style.display = 'none';
+                fileList.style.display = 'none';
+            });
+        }
+
+        function displayError(error) {
+            const errorHtml = `
+                <div class="error-message">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <p>${error}</p>
+                    <div class="error-details">
+                        This file may be a DICOM report, structured report, or presentation state that doesn't contain image data.
+                        You can still view the DICOM information in the panel on the left.
+                    </div>
+                </div>
+            `;
+            imageContainer.innerHTML = errorHtml;
+            frameControls.style.display = 'none';
+            playbackControls.style.display = 'none';
+        }
+
+        function displayDicomDirFiles(files) {
+            // Clear previous content
+            dicomInfo.innerHTML = '<h6>DICOMDIR Contents</h6>';
+            imageContainer.innerHTML = '<p class="text-muted">Select a file from the list to view</p>';
+            frameControls.style.display = 'none';
+            playbackControls.style.display = 'none';
+
+            // Create file list
+            const listGroup = fileList.querySelector('.list-group');
+            listGroup.innerHTML = '';
+            
+            files.forEach((file, index) => {
+                const item = document.createElement('a');
+                item.href = '#';
+                item.className = 'list-group-item list-group-item-action';
+                
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                
+                // Header with title and date
+                const header = document.createElement('div');
+                header.className = 'file-item-header';
+                
+                const title = document.createElement('div');
+                title.className = 'file-item-title';
+                title.textContent = file.patient_name;
+                
+                const date = document.createElement('div');
+                date.className = 'file-item-date';
+                date.textContent = file.study_date;
+                
+                header.appendChild(title);
+                header.appendChild(date);
+                
+                // Study description
+                const description = document.createElement('div');
+                description.className = 'file-item-details';
+                description.textContent = file.study_description;
+                
+                // Tags
+                const tags = document.createElement('div');
+                tags.className = 'file-item-tags';
+                
+                if (file.modality) {
+                    const modalityTag = document.createElement('span');
+                    modalityTag.className = 'file-item-tag';
+                    modalityTag.textContent = `Modality: ${file.modality}`;
+                    tags.appendChild(modalityTag);
+                }
+                
+                if (file.series_number) {
+                    const seriesTag = document.createElement('span');
+                    seriesTag.className = 'file-item-tag';
+                    seriesTag.textContent = `Series: ${file.series_number}`;
+                    tags.appendChild(seriesTag);
+                }
+                
+                if (file.image_size) {
+                    const sizeTag = document.createElement('span');
+                    sizeTag.className = 'file-item-tag';
+                    sizeTag.textContent = `Size: ${file.image_size}`;
+                    tags.appendChild(sizeTag);
+                }
+                
+                fileItem.appendChild(header);
+                fileItem.appendChild(description);
+                fileItem.appendChild(tags);
+                
+                item.appendChild(fileItem);
+                item.dataset.index = index;
+                
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadDicomDirFile(index);
+                });
+                
+                listGroup.appendChild(item);
+            });
+            
+            fileList.style.display = 'block';
+        }
+
+        function loadDicomDirFile(index) {
+            const formData = new FormData();
+            formData.append('dicomdir', currentDicomDir);
+            formData.append('file_index', index);
+
+            // Show loading state
+            imageContainer.innerHTML = '<p>Loading...</p>';
+
+            fetch('/load_dicomdir_file', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayDicomInfo(data.info);
+                    if (data.error) {
+                        displayError(data.error);
+                    } else {
+                        displayDicomImage(data);
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to load DICOM file');
+                }
+            })
+            .catch(error => {
+                displayError(error.message);
+            });
+        }
+
+        function displayDicomInfo(info) {
+            let infoHtml = '<table class="table table-sm">';
+            for (const [key, value] of Object.entries(info)) {
+                infoHtml += `
+                    <tr>
+                        <th>${key}</th>
+                        <td>${value}</td>
+                    </tr>
+                `;
+            }
+            infoHtml += '</table>';
+            dicomInfo.innerHTML = infoHtml;
+        }
+
+        function displayDicomImage(data) {
+            // Display image
+            imageContainer.innerHTML = `<img src="data:image/png;base64,${data.image}" class="dicom-image" alt="DICOM Image">`;
+            
+            // Update frame controls
+            totalFrames = data.total_frames || 1;
+            currentFrame = 0;
+            frameControls.style.display = 'flex';
+            frameCounter.textContent = `Frame ${currentFrame + 1} of ${totalFrames}`;
+            
+            // Update slider
+            frameSlider.max = totalFrames - 1;
+            frameSlider.value = 0;
+            
+            // Update button states
+            prevFrameBtn.disabled = true;
+            nextFrameBtn.disabled = totalFrames <= 1;
+            
+            // Show/hide playback controls
+            playbackControls.style.display = totalFrames > 1 ? 'flex' : 'none';
+            
+            // Reset playback state
+            if (isPlaying) {
+                stopPlayback();
+                playPauseBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+                playPauseBtn.classList.remove('active');
+                isPlaying = false;
+            }
+        }
+    </script>
 </body>
 </html> 
