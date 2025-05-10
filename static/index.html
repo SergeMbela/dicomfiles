@@ -248,25 +248,214 @@
         // Initialize canvas
         function initCanvas() {
             canvas = document.getElementById('measurementCanvas');
+            if (!canvas) {
+                console.error('Canvas element not found');
+                return;
+            }
             ctx = canvas.getContext('2d');
             resizeCanvas();
+
+            // Add event listeners for measurements
+            canvas.addEventListener('mousemove', (e) => {
+                if (isMeasuring) {
+                    drawMeasurementPreview(e);
+                }
+            });
+
+            canvas.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if (isMeasuring) {
+                    finishMeasurement();
+                    clearMeasurements();
+                }
+            });
+
+            canvas.addEventListener('dblclick', (e) => {
+                if (isMeasuring && measurementType === 'area' && measurementPoints.length >= 3) {
+                    drawAreaMeasurement();
+                    measurements.push({
+                        type: 'area',
+                        points: [...measurementPoints]
+                    });
+                    finishMeasurement();
+                }
+            });
+
+            // Add touch support for mobile devices
+            canvas.addEventListener('touchstart', (e) => {
+                if (isMeasuring) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('click', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    handleMeasurementClick(mouseEvent);
+                }
+            });
+
+            canvas.addEventListener('touchmove', (e) => {
+                if (isMeasuring) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousemove', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    drawMeasurementPreview(mouseEvent);
+                }
+            });
         }
+
+        // Initialize the viewer
+        function initViewer() {
+            // Initialize canvas first
+            initCanvas();
+            
+            // Initialize UI state
+            updateImageCounter();
+            updateNavigationButtons();
+
+            // Add event listeners for window/level controls
+            const windowWidthInput = document.getElementById('window-width');
+            const windowCenterInput = document.getElementById('window-center');
+            const rotationInput = document.getElementById('rotation');
+
+            if (windowWidthInput) {
+                windowWidthInput.addEventListener('input', updateWindowLevel);
+            }
+            if (windowCenterInput) {
+                windowCenterInput.addEventListener('input', updateWindowLevel);
+            }
+            if (rotationInput) {
+                rotationInput.addEventListener('input', updateRotation);
+            }
+        }
+
+        // Loading state management
+        function showLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+            }
+        }
+
+        function hideLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
+        }
+
+        // Call initViewer when the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', initViewer);
 
         function resizeCanvas() {
             const img = document.getElementById('dicomImage');
+            if (!img || !canvas) return;
+            
             canvas.width = img.naturalWidth;
             canvas.height = img.naturalHeight;
             canvas.style.width = img.width + 'px';
             canvas.style.height = img.height + 'px';
         }
 
-        // Window/Level presets
-        const presets = {
-            lung: { width: 1500, center: -600 },
-            bone: { width: 2000, center: 400 },
-            brain: { width: 80, center: 40 },
-            abdomen: { width: 400, center: 40 }
-        };
+        function drawMeasurementPreview(e) {
+            if (!canvas || !ctx) return;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            redrawMeasurements();
+            
+            if (measurementPoints.length > 0) {
+                const lastPoint = measurementPoints[measurementPoints.length - 1];
+                const mousePos = getMousePosition(e);
+                
+                ctx.beginPath();
+                ctx.moveTo(lastPoint.x, lastPoint.y);
+                ctx.lineTo(mousePos.x, mousePos.y);
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+
+        function getMousePosition(e) {
+            if (!canvas) return { x: 0, y: 0 };
+            
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: (e.clientX - rect.left - translateX) / currentZoom,
+                y: (e.clientY - rect.top - translateY) / currentZoom
+            };
+        }
+
+        function startDistanceMeasurement() {
+            if (!canvas) return;
+            
+            isMeasuring = true;
+            measurementType = 'distance';
+            measurementPoints = [];
+            canvas.style.pointerEvents = 'auto';
+            canvas.addEventListener('click', handleMeasurementClick);
+            showTooltip('Click two points to measure distance', 10, 10);
+        }
+
+        function startAreaMeasurement() {
+            if (!canvas) return;
+            
+            isMeasuring = true;
+            measurementType = 'area';
+            measurementPoints = [];
+            canvas.style.pointerEvents = 'auto';
+            canvas.addEventListener('click', handleMeasurementClick);
+            showTooltip('Click three or more points to measure area. Double-click to finish.', 10, 10);
+        }
+
+        function startAngleMeasurement() {
+            if (!canvas) return;
+            
+            isMeasuring = true;
+            measurementType = 'angle';
+            measurementPoints = [];
+            canvas.style.pointerEvents = 'auto';
+            canvas.addEventListener('click', handleMeasurementClick);
+            showTooltip('Click three points to measure angle', 10, 10);
+        }
+
+        function finishMeasurement() {
+            if (!canvas) return;
+            
+            isMeasuring = false;
+            measurementType = null;
+            measurementPoints = [];
+            canvas.style.pointerEvents = 'none';
+            canvas.removeEventListener('click', handleMeasurementClick);
+        }
+
+        function clearMeasurements() {
+            if (!canvas || !ctx) return;
+            
+            measurements = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function redrawMeasurements() {
+            if (!canvas || !ctx) return;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            measurements.forEach(measurement => {
+                if (measurement.type === 'distance') {
+                    measurementPoints = measurement.points;
+                    drawDistanceMeasurement();
+                } else if (measurement.type === 'area') {
+                    measurementPoints = measurement.points;
+                    drawAreaMeasurement();
+                } else if (measurement.type === 'angle') {
+                    measurementPoints = measurement.points;
+                    drawAngleMeasurement();
+                }
+            });
+        }
 
         function uploadFiles() {
             const fileInput = document.getElementById('dicomFile');
@@ -328,16 +517,38 @@
                     hideLoading();
                 };
 
-                img.onload = function() {
-                    hideLoading();
-                    updateImageCounter();
-                    resizeCanvas();
-                    redrawMeasurements();
-                };
-
                 // Add timestamp to prevent caching
                 const timestamp = new Date().getTime();
-                img.src = `/get_image/${index}?window_width=${windowWidth}&window_center=${windowCenter}&rotation=${rotation}&t=${timestamp}`;
+                const imageUrl = `/get_image/${index}?window_width=${windowWidth}&window_center=${windowCenter}&rotation=${rotation}&t=${timestamp}`;
+                console.log('Loading image:', imageUrl);
+
+                // Fetch the image data
+                fetch(imageUrl)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success && data.image) {
+                            img.src = 'data:image/png;base64,' + data.image;
+                            img.onload = function() {
+                                hideLoading();
+                                updateImageCounter();
+                                resizeCanvas();
+                                redrawMeasurements();
+                                updateNavigationButtons();
+                            };
+                        } else {
+                            throw new Error(data.error || 'Error loading image');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error loading image: ' + error.message);
+                        hideLoading();
+                    });
             }
         }
 
@@ -387,54 +598,11 @@
             const prevButton = document.getElementById('prev-image');
             const nextButton = document.getElementById('next-image');
             
-            prevButton.disabled = currentImageIndex === 0;
-            nextButton.disabled = currentImageIndex === uploadedFiles.length - 1;
-        }
-
-        // Add keyboard navigation
-        document.addEventListener('keydown', (e) => {
-            if (uploadedFiles.length > 0) {
-                if (e.key === 'ArrowLeft') {
-                    previousImage();
-                } else if (e.key === 'ArrowRight') {
-                    nextImage();
-                }
-            }
-        });
-
-        // Add error handling for image loading
-        window.addEventListener('error', function(e) {
-            if (e.target.tagName === 'IMG') {
-                console.error('Image loading error:', e);
-                alert('Error loading image. Please try again.');
-                hideLoading();
-            }
-        }, true);
-
-        // Add loading state management
-        function showLoading() {
-            const overlay = document.getElementById('loadingOverlay');
-            if (overlay) {
-                overlay.style.display = 'flex';
+            if (prevButton && nextButton) {
+                prevButton.disabled = currentImageIndex === 0;
+                nextButton.disabled = currentImageIndex === uploadedFiles.length - 1;
             }
         }
-
-        function hideLoading() {
-            const overlay = document.getElementById('loadingOverlay');
-            if (overlay) {
-                overlay.style.display = 'none';
-            }
-        }
-
-        // Initialize the viewer
-        function initViewer() {
-            updateImageCounter();
-            updateNavigationButtons();
-            initCanvas();
-        }
-
-        // Call initViewer when the page loads
-        window.addEventListener('load', initViewer);
 
         function toggleMeasurementTools() {
             const tools = document.getElementById('measurementTools');
@@ -470,7 +638,7 @@
                 });
                 finishMeasurement();
             } else {
-                drawMeasurementPreview();
+                drawMeasurementPreview(e);
             }
         }
 
@@ -544,23 +712,6 @@
             ctx.fillText(`${angle.toFixed(1)}°`, p2.x, p2.y - 10);
         }
 
-        function drawMeasurementPreview() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            redrawMeasurements();
-            
-            if (measurementPoints.length > 0) {
-                const lastPoint = measurementPoints[measurementPoints.length - 1];
-                const mousePos = getMousePosition(event);
-                
-                ctx.beginPath();
-                ctx.moveTo(lastPoint.x, lastPoint.y);
-                ctx.lineTo(mousePos.x, mousePos.y);
-                ctx.strokeStyle = '#00ff00';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            }
-        }
-
         function drawPoint(x, y) {
             ctx.beginPath();
             ctx.arc(x, y, 4, 0, 2 * Math.PI);
@@ -601,43 +752,6 @@
             const cos = dot / (mag1 * mag2);
             const angle = Math.acos(Math.max(-1, Math.min(1, cos)));
             return angle * (180 / Math.PI);
-        }
-
-        function getMousePosition(e) {
-            const rect = canvas.getBoundingClientRect();
-            return {
-                x: (e.clientX - rect.left - translateX) / currentZoom,
-                y: (e.clientY - rect.top - translateY) / currentZoom
-            };
-        }
-
-        function finishMeasurement() {
-            isMeasuring = false;
-            measurementType = null;
-            measurementPoints = [];
-            canvas.style.pointerEvents = 'none';
-            canvas.removeEventListener('click', handleMeasurementClick);
-        }
-
-        function clearMeasurements() {
-            measurements = [];
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-
-        function redrawMeasurements() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            measurements.forEach(measurement => {
-                if (measurement.type === 'distance') {
-                    measurementPoints = measurement.points;
-                    drawDistanceMeasurement();
-                } else if (measurement.type === 'area') {
-                    measurementPoints = measurement.points;
-                    drawAreaMeasurement();
-                } else if (measurement.type === 'angle') {
-                    measurementPoints = measurement.points;
-                    drawAngleMeasurement();
-                }
-            });
         }
 
         function applyPreset(presetName) {
@@ -720,52 +834,6 @@
             }
         });
 
-        // Add right-click to cancel measurement
-        canvas.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            if (isMeasuring) {
-                finishMeasurement();
-                clearMeasurements();
-            }
-        });
-
-        // Add double-click to finish area measurement
-        canvas.addEventListener('dblclick', (e) => {
-            if (isMeasuring && measurementType === 'area' && measurementPoints.length >= 3) {
-                drawAreaMeasurement();
-                measurements.push({
-                    type: 'area',
-                    points: [...measurementPoints]
-                });
-                finishMeasurement();
-            }
-        });
-
-        // Add touch support for mobile devices
-        canvas.addEventListener('touchstart', (e) => {
-            if (isMeasuring) {
-                e.preventDefault();
-                const touch = e.touches[0];
-                const mouseEvent = new MouseEvent('click', {
-                    clientX: touch.clientX,
-                    clientY: touch.clientY
-                });
-                handleMeasurementClick(mouseEvent);
-            }
-        });
-
-        canvas.addEventListener('touchmove', (e) => {
-            if (isMeasuring) {
-                e.preventDefault();
-                const touch = e.touches[0];
-                const mouseEvent = new MouseEvent('mousemove', {
-                    clientX: touch.clientX,
-                    clientY: touch.clientY
-                });
-                drawMeasurementPreview(mouseEvent);
-            }
-        });
-
         // Add measurement tooltips
         function showTooltip(text, x, y) {
             const tooltip = document.createElement('div');
@@ -785,33 +853,6 @@
             setTimeout(() => {
                 tooltip.remove();
             }, 2000);
-        }
-
-        function startDistanceMeasurement() {
-            isMeasuring = true;
-            measurementType = 'distance';
-            measurementPoints = [];
-            canvas.style.pointerEvents = 'auto';
-            canvas.addEventListener('click', handleMeasurementClick);
-            showTooltip('Click two points to measure distance', 10, 10);
-        }
-
-        function startAreaMeasurement() {
-            isMeasuring = true;
-            measurementType = 'area';
-            measurementPoints = [];
-            canvas.style.pointerEvents = 'auto';
-            canvas.addEventListener('click', handleMeasurementClick);
-            showTooltip('Click three or more points to measure area. Double-click to finish.', 10, 10);
-        }
-
-        function startAngleMeasurement() {
-            isMeasuring = true;
-            measurementType = 'angle';
-            measurementPoints = [];
-            canvas.style.pointerEvents = 'auto';
-            canvas.addEventListener('click', handleMeasurementClick);
-            showTooltip('Click three points to measure angle', 10, 10);
         }
     </script>
 </body>

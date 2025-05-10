@@ -414,18 +414,42 @@ def upload_file():
 @app.route('/get_image/<int:index>')
 def get_image(index):
     try:
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], f'file_{index}.dcm')
-        if not os.path.exists(file_path):
-            return jsonify({'success': False, 'error': 'File not found'}), 404
+        # Get window/level parameters
+        window_width = request.args.get('window_width', type=float)
+        window_center = request.args.get('window_center', type=float)
+        rotation = request.args.get('rotation', type=float, default=0)
         
-        img_data, _ = process_dicom_file(file_path)
-        if img_data:
-            return send_file(img_data, mimetype='image/png')
-        else:
-            return jsonify({'success': False, 'error': 'Error processing image'}), 500
+        # Get the list of uploaded files
+        uploaded_files = glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], '*'))
+        if not uploaded_files:
+            return jsonify({'error': 'No files uploaded'}), 404
+        
+        # Sort files to ensure consistent order
+        uploaded_files.sort()
+        
+        if index < 0 or index >= len(uploaded_files):
+            return jsonify({'error': 'Invalid image index'}), 404
+        
+        # Get the DICOM file
+        dicom_file = uploaded_files[index]
+        
+        # Process the DICOM file
+        try:
+            # Get the image data
+            image_data = get_dicom_image(dicom_file, window_center, window_width, rotation)
+            
+            # Return the image as base64
+            return jsonify({
+                'success': True,
+                'image': image_data
+            })
+        except Exception as e:
+            print(f"Error processing DICOM file: {str(e)}")
+            return jsonify({'error': str(e)}), 500
             
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        print(f"Error in get_image route: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/update_window_level', methods=['POST'])
 def update_window_level():
