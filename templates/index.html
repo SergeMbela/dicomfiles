@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="spinner-border text-light" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <div class="container-fluid mt-4">
+        <h1 class="text-center mb-4">DICOM Viewer</h1>
+        
+        <div class="row">
+            <div class="col-md-9">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="upload-section mb-4">
+                            <form id="uploadForm" class="mb-3">
+                                <div class="mb-3">
+                                    <label for="dicomFile" class="form-label">Upload DICOM Files</label>
+                                    <input type="file" class="form-control" id="dicomFile" accept=".dcm,.dicom,.dicomdir,DICOMDIR" multiple>
+                                    <div class="form-text">Supported formats: .dcm, .dicom, DICOMDIR</div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-upload me-2"></i>Upload
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <div id="imageContainer" class="text-center" style="display: none;">
+                            <div class="image-wrapper">
+                                <img id="dicomImage" class="img-fluid" alt="DICOM Image">
+                            </div>
+                            
+                            <!-- Player Controls -->
+                            <div class="player-controls mt-4">
+                                <div class="player-main-controls">
+                                    <button class="btn btn-lg btn-secondary" onclick="previousImage()" id="prevBtn" title="Previous Image (←)">
+                                        <i class="fas fa-step-backward"></i>
+                                    </button>
+                                    <div class="player-info">
+                                        <span id="imageCounter" class="counter-text">Image 1 of 1</span>
+                                        <div class="slider-container">
+                                            <input type="range" class="form-range" id="imageSlider" min="0" value="0">
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-lg btn-secondary" onclick="nextImage()" id="nextBtn" title="Next Image (→)">
+                                        <i class="fas fa-step-forward"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Image Controls -->
+                            <div class="controls mt-4">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="zoom-controls mb-3">
+                                            <h6>Zoom Controls</h6>
+                                            <div class="btn-group">
+                                                <button class="btn btn-secondary" onclick="zoomIn()" title="Zoom In (+)">
+                                                    <i class="fas fa-search-plus"></i> Zoom In
+                                                </button>
+                                                <button class="btn btn-secondary" onclick="zoomOut()" title="Zoom Out (-)">
+                                                    <i class="fas fa-search-minus"></i> Zoom Out
+                                                </button>
+                                                <button class="btn btn-secondary" onclick="resetZoom()" title="Reset Zoom (R)">
+                                                    <i class="fas fa-sync"></i> Reset
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="rotation-controls mb-3">
+                                            <h6>Rotation Controls</h6>
+                                            <div class="btn-group">
+                                                <button class="btn btn-secondary" onclick="rotateLeft()" title="Rotate Left ([)">
+                                                    <i class="fas fa-undo"></i> Rotate Left
+                                                </button>
+                                                <button class="btn btn-secondary" onclick="rotateRight()" title="Rotate Right (])">
+                                                    <i class="fas fa-redo"></i> Rotate Right
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="window-level-controls">
+                                            <h6>Window/Level Controls</h6>
+                                            <div class="preset-controls mb-3">
+                                                <div class="btn-group w-100">
+                                                    <button class="btn btn-outline-secondary" onclick="applyPreset('lung')">Lung</button>
+                                                    <button class="btn btn-outline-secondary" onclick="applyPreset('brain')">Brain</button>
+                                                    <button class="btn btn-outline-secondary" onclick="applyPreset('bone')">Bone</button>
+                                                    <button class="btn btn-outline-secondary" onclick="applyPreset('abdomen')">Abdomen</button>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="windowWidth" class="form-label">Window Width</label>
+                                                <input type="range" class="form-range" id="windowWidth" min="1" max="4000" value="2000">
+                                                <div class="d-flex justify-content-between">
+                                                    <span id="windowWidthValue">2000</span>
+                                                    <button class="btn btn-link" onclick="resetWindowLevel()">Reset</button>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="windowCenter" class="form-label">Window Center</label>
+                                                <input type="range" class="form-range" id="windowCenter" min="-1000" max="3000" value="1000">
+                                                <span id="windowCenterValue">1000</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">DICOM Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="dicomInfo" class="dicom-info">
+                            <p class="text-muted">Upload a DICOM file to view its information</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html> 

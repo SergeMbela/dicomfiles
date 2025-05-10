@@ -1,0 +1,284 @@
+body {
+    background-color: #f8f9fa;
+}
+
+.container-fluid {
+    max-width: 1800px;
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.loading-overlay .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: none;
+    margin-bottom: 20px;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #eee;
+}
+
+.image-wrapper {
+    position: relative;
+    display: inline-block;
+    margin: 20px 0;
+    background-color: #000;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#dicomImage {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    transition: transform 0.3s ease;
+}
+
+.controls {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.zoom-controls, .rotation-controls, .window-level-controls {
+    background-color: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.btn-group {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.btn {
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.form-range {
+    height: 1.5rem;
+}
+
+.form-range::-webkit-slider-thumb {
+    background: #0d6efd;
+}
+
+.form-range::-moz-range-thumb {
+    background: #0d6efd;
+}
+
+.dicom-info {
+    font-size: 0.9rem;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.dicom-info p {
+    margin-bottom: 0.5rem;
+}
+
+/* Player Controls */
+.player-controls {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.player-main-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    background-color: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.player-info {
+    flex: 1;
+    max-width: 600px;
+    text-align: center;
+}
+
+.counter-text {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 10px;
+    color: #495057;
+}
+
+.slider-container {
+    padding: 0 10px;
+}
+
+#imageSlider {
+    width: 100%;
+    margin: 0;
+}
+
+.btn-lg {
+    padding: 12px 24px;
+    font-size: 1.2rem;
+    min-width: 60px;
+}
+
+.btn-lg i {
+    font-size: 1.4rem;
+}
+
+/* Control sections */
+.zoom-controls, .rotation-controls, .window-level-controls {
+    margin-bottom: 20px;
+}
+
+.zoom-controls h6, .rotation-controls h6, .window-level-controls h6 {
+    color: #495057;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.preset-controls .btn-group {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+}
+
+.preset-controls .btn {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Upload section */
+.upload-section {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.form-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+/* Image container */
+#imageContainer {
+    background-color: #000;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+/* DICOM info panel */
+.card-header h5 {
+    color: #495057;
+    font-weight: 600;
+}
+
+.dicom-info p {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+
+.dicom-info p:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.dicom-info table {
+    width: 100%;
+}
+
+.dicom-info th {
+    font-weight: 600;
+    padding: 4px;
+    text-align: left;
+}
+
+.dicom-info td {
+    padding: 4px;
+    word-break: break-word;
+}
+
+/* Alert styles */
+.alert {
+    margin-top: 1rem;
+    margin-bottom: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .player-main-controls {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .player-info {
+        width: 100%;
+    }
+    
+    .btn-lg {
+        width: 100%;
+    }
+    
+    .preset-controls .btn-group {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Tooltip styles */
+[title] {
+    position: relative;
+    cursor: help;
+}
+
+/* Button hover effects */
+.btn-secondary:hover {
+    background-color: #5c636a;
+    border-color: #565e64;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #6c757d;
+    color: white;
+}
+
+/* Form control focus states */
+.form-control:focus,
+.form-range:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+} 

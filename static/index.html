@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .viewer-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .image-container {
+            flex: 1;
+            text-align: center;
+        }
+        .controls {
+            width: 300px;
+            padding: 20px;
+            background-color: #f8f8f8;
+            border-radius: 8px;
+        }
+        .image-display {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+        }
+        .slider-container {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        .file-upload {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DICOM Viewer</h1>
+        
+        <div class="file-upload">
+            <input type="file" id="dicomFile" accept=".dcm,.dicom" multiple>
+            <button onclick="uploadFiles()">Upload DICOM Files</button>
+        </div>
+
+        <div class="viewer-container">
+            <div class="image-container">
+                <img id="dicomImage" class="image-display" src="" alt="DICOM Image">
+                <div class="nav-buttons">
+                    <button onclick="previousImage()">Previous</button>
+                    <button onclick="nextImage()">Next</button>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <h3>Image Controls</h3>
+                <div class="slider-container">
+                    <label for="windowWidth">Window Width:</label>
+                    <input type="range" id="windowWidth" min="1" max="4000" value="2000" onchange="updateWindowLevel()">
+                    <span id="windowWidthValue">2000</span>
+                </div>
+                
+                <div class="slider-container">
+                    <label for="windowCenter">Window Center:</label>
+                    <input type="range" id="windowCenter" min="-1000" max="3000" value="1000" onchange="updateWindowLevel()">
+                    <span id="windowCenterValue">1000</span>
+                </div>
+
+                <div class="slider-container">
+                    <label for="rotation">Rotation:</label>
+                    <input type="range" id="rotation" min="0" max="360" value="0" onchange="updateRotation()">
+                    <span id="rotationValue">0°</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentImageIndex = 0;
+        let uploadedFiles = [];
+
+        function uploadFiles() {
+            const fileInput = document.getElementById('dicomFile');
+            const files = fileInput.files;
+            
+            if (files.length === 0) {
+                alert('Please select DICOM files to upload');
+                return;
+            }
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    uploadedFiles = data.files;
+                    currentImageIndex = 0;
+                    loadImage(currentImageIndex);
+                } else {
+                    alert('Error uploading files: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error uploading files');
+            });
+        }
+
+        function loadImage(index) {
+            if (index >= 0 && index < uploadedFiles.length) {
+                const img = document.getElementById('dicomImage');
+                img.src = `/get_image/${index}?t=${new Date().getTime()}`;
+            }
+        }
+
+        function updateWindowLevel() {
+            const windowWidth = document.getElementById('windowWidth').value;
+            const windowCenter = document.getElementById('windowCenter').value;
+            
+            document.getElementById('windowWidthValue').textContent = windowWidth;
+            document.getElementById('windowCenterValue').textContent = windowCenter;
+
+            const img = document.getElementById('dicomImage');
+            img.src = `/get_image/${currentImageIndex}?window_width=${windowWidth}&window_center=${windowCenter}&t=${new Date().getTime()}`;
+        }
+
+        function updateRotation() {
+            const rotation = document.getElementById('rotation').value;
+            document.getElementById('rotationValue').textContent = rotation + '°';
+            
+            const img = document.getElementById('dicomImage');
+            img.src = `/get_image/${currentImageIndex}?rotation=${rotation}&t=${new Date().getTime()}`;
+        }
+
+        function previousImage() {
+            if (currentImageIndex > 0) {
+                currentImageIndex--;
+                loadImage(currentImageIndex);
+            }
+        }
+
+        function nextImage() {
+            if (currentImageIndex < uploadedFiles.length - 1) {
+                currentImageIndex++;
+                loadImage(currentImageIndex);
+            }
+        }
+    </script>
+</body>
+</html> 
