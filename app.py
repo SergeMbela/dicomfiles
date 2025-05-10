@@ -10,6 +10,7 @@ import glob
 import io
 import tempfile
 import shutil
+from datetime import datetime
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -27,13 +28,143 @@ def get_dicom_info(dicom_file):
     ds = pydicom.dcmread(dicom_file)
     info = {}
     
-    # Get basic DICOM information
-    for elem in ds:
-        if elem.keyword and elem.VR != 'SQ':  # Skip sequence elements
-            try:
-                info[elem.keyword] = str(elem.value)
-            except:
-                continue
+    # Get comprehensive DICOM information
+    try:
+        # Patient Information
+        info['PatientInfo'] = {
+            'PatientName': str(getattr(ds, 'PatientName', 'N/A')),
+            'PatientID': str(getattr(ds, 'PatientID', 'N/A')),
+            'PatientBirthDate': str(getattr(ds, 'PatientBirthDate', 'N/A')),
+            'PatientSex': str(getattr(ds, 'PatientSex', 'N/A')),
+            'PatientAge': str(getattr(ds, 'PatientAge', 'N/A')),
+            'PatientWeight': str(getattr(ds, 'PatientWeight', 'N/A')),
+            'PatientOrientation': str(getattr(ds, 'PatientOrientation', 'N/A')),
+            'PatientPosition': str(getattr(ds, 'PatientPosition', 'N/A'))
+        }
+        
+        # Study Information
+        info['StudyInfo'] = {
+            'StudyDate': str(getattr(ds, 'StudyDate', 'N/A')),
+            'StudyTime': str(getattr(ds, 'StudyTime', 'N/A')),
+            'StudyDescription': str(getattr(ds, 'StudyDescription', 'N/A')),
+            'StudyInstanceUID': str(getattr(ds, 'StudyInstanceUID', 'N/A')),
+            'StudyID': str(getattr(ds, 'StudyID', 'N/A')),
+            'AccessionNumber': str(getattr(ds, 'AccessionNumber', 'N/A')),
+            'ReferringPhysicianName': str(getattr(ds, 'ReferringPhysicianName', 'N/A')),
+            'StudyPriorityID': str(getattr(ds, 'StudyPriorityID', 'N/A')),
+            'StudyStatusID': str(getattr(ds, 'StudyStatusID', 'N/A'))
+        }
+        
+        # Series Information
+        info['SeriesInfo'] = {
+            'SeriesDescription': str(getattr(ds, 'SeriesDescription', 'N/A')),
+            'SeriesNumber': str(getattr(ds, 'SeriesNumber', 'N/A')),
+            'SeriesInstanceUID': str(getattr(ds, 'SeriesInstanceUID', 'N/A')),
+            'Modality': str(getattr(ds, 'Modality', 'N/A')),
+            'SeriesDate': str(getattr(ds, 'SeriesDate', 'N/A')),
+            'SeriesTime': str(getattr(ds, 'SeriesTime', 'N/A')),
+            'ProtocolName': str(getattr(ds, 'ProtocolName', 'N/A')),
+            'SeriesType': str(getattr(ds, 'SeriesType', 'N/A')),
+            'SeriesModality': str(getattr(ds, 'SeriesModality', 'N/A')),
+            'BodyPartExamined': str(getattr(ds, 'BodyPartExamined', 'N/A')),
+            'ViewPosition': str(getattr(ds, 'ViewPosition', 'N/A'))
+        }
+        
+        # Image Information
+        info['ImageInfo'] = {
+            'ImageType': str(getattr(ds, 'ImageType', 'N/A')),
+            'InstanceNumber': str(getattr(ds, 'InstanceNumber', 'N/A')),
+            'ImageSize': f"{ds.Rows}x{ds.Columns}",
+            'PixelSpacing': str(getattr(ds, 'PixelSpacing', 'N/A')),
+            'SliceThickness': str(getattr(ds, 'SliceThickness', 'N/A')),
+            'SpacingBetweenSlices': str(getattr(ds, 'SpacingBetweenSlices', 'N/A')),
+            'ImageOrientation': str(getattr(ds, 'ImageOrientationPatient', 'N/A')),
+            'ImagePosition': str(getattr(ds, 'ImagePositionPatient', 'N/A')),
+            'SamplesPerPixel': str(getattr(ds, 'SamplesPerPixel', 'N/A')),
+            'PhotometricInterpretation': str(getattr(ds, 'PhotometricInterpretation', 'N/A')),
+            'PlanarConfiguration': str(getattr(ds, 'PlanarConfiguration', 'N/A')),
+            'PixelAspectRatio': str(getattr(ds, 'PixelAspectRatio', 'N/A')),
+            'ImageFormat': str(getattr(ds, 'ImageFormat', 'N/A')),
+            'LossyImageCompression': str(getattr(ds, 'LossyImageCompression', 'N/A')),
+            'LossyImageCompressionRatio': str(getattr(ds, 'LossyImageCompressionRatio', 'N/A')),
+            'ImageComments': str(getattr(ds, 'ImageComments', 'N/A'))
+        }
+        
+        # Window/Level Information
+        info['WindowLevelInfo'] = {
+            'WindowCenter': str(getattr(ds, 'WindowCenter', 'N/A')),
+            'WindowWidth': str(getattr(ds, 'WindowWidth', 'N/A')),
+            'RescaleIntercept': str(getattr(ds, 'RescaleIntercept', 'N/A')),
+            'RescaleSlope': str(getattr(ds, 'RescaleSlope', 'N/A')),
+            'WindowCenterWidthExplanation': str(getattr(ds, 'WindowCenterWidthExplanation', 'N/A')),
+            'VOILUTFunction': str(getattr(ds, 'VOILUTFunction', 'N/A')),
+            'VOILUTSequence': str(getattr(ds, 'VOILUTSequence', 'N/A')),
+            'PresentationLUTShape': str(getattr(ds, 'PresentationLUTShape', 'N/A'))
+        }
+        
+        # Technical Information
+        info['TechnicalInfo'] = {
+            'Manufacturer': str(getattr(ds, 'Manufacturer', 'N/A')),
+            'ManufacturerModelName': str(getattr(ds, 'ManufacturerModelName', 'N/A')),
+            'DeviceSerialNumber': str(getattr(ds, 'DeviceSerialNumber', 'N/A')),
+            'SoftwareVersions': str(getattr(ds, 'SoftwareVersions', 'N/A')),
+            'KVP': str(getattr(ds, 'KVP', 'N/A')),
+            'ExposureTime': str(getattr(ds, 'ExposureTime', 'N/A')),
+            'XRayTubeCurrent': str(getattr(ds, 'XRayTubeCurrent', 'N/A')),
+            'Exposure': str(getattr(ds, 'Exposure', 'N/A')),
+            'ExposureInuAs': str(getattr(ds, 'ExposureInuAs', 'N/A')),
+            'FocalSpots': str(getattr(ds, 'FocalSpots', 'N/A')),
+            'FilterType': str(getattr(ds, 'FilterType', 'N/A')),
+            'GeneratorPower': str(getattr(ds, 'GeneratorPower', 'N/A')),
+            'CollimatorGridName': str(getattr(ds, 'CollimatorGridName', 'N/A')),
+            'DistanceSourceToDetector': str(getattr(ds, 'DistanceSourceToDetector', 'N/A')),
+            'DistanceSourceToPatient': str(getattr(ds, 'DistanceSourceToPatient', 'N/A')),
+            'PixelRepresentation': str(getattr(ds, 'PixelRepresentation', 'N/A')),
+            'BitsAllocated': str(getattr(ds, 'BitsAllocated', 'N/A')),
+            'BitsStored': str(getattr(ds, 'BitsStored', 'N/A')),
+            'HighBit': str(getattr(ds, 'HighBit', 'N/A')),
+            'PixelPaddingValue': str(getattr(ds, 'PixelPaddingValue', 'N/A')),
+            'PixelPaddingRangeLimit': str(getattr(ds, 'PixelPaddingRangeLimit', 'N/A'))
+        }
+        
+        # Acquisition Information
+        info['AcquisitionInfo'] = {
+            'AcquisitionDate': str(getattr(ds, 'AcquisitionDate', 'N/A')),
+            'AcquisitionTime': str(getattr(ds, 'AcquisitionTime', 'N/A')),
+            'AcquisitionNumber': str(getattr(ds, 'AcquisitionNumber', 'N/A')),
+            'AcquisitionDeviceProcessingDescription': str(getattr(ds, 'AcquisitionDeviceProcessingDescription', 'N/A')),
+            'AcquisitionProtocol': str(getattr(ds, 'AcquisitionProtocol', 'N/A')),
+            'AcquisitionType': str(getattr(ds, 'AcquisitionType', 'N/A')),
+            'AcquisitionMatrix': str(getattr(ds, 'AcquisitionMatrix', 'N/A')),
+            'AcquisitionDuration': str(getattr(ds, 'AcquisitionDuration', 'N/A')),
+            'AcquisitionDatetime': str(getattr(ds, 'AcquisitionDatetime', 'N/A'))
+        }
+        
+        # Image Quality Information
+        info['QualityInfo'] = {
+            'ImageQuality': str(getattr(ds, 'ImageQuality', 'N/A')),
+            'ImageQualityIndicator': str(getattr(ds, 'ImageQualityIndicator', 'N/A')),
+            'ImageQualityRating': str(getattr(ds, 'ImageQualityRating', 'N/A')),
+            'ImageQualityRatingDescription': str(getattr(ds, 'ImageQualityRatingDescription', 'N/A')),
+            'ImageQualityRatingValue': str(getattr(ds, 'ImageQualityRatingValue', 'N/A')),
+            'ImageQualityRatingValueDescription': str(getattr(ds, 'ImageQualityRatingValueDescription', 'N/A'))
+        }
+        
+        # Add image statistics
+        try:
+            pixel_array = ds.pixel_array
+            info['ImageStatistics'] = {
+                'MinValue': str(float(pixel_array.min())),
+                'MaxValue': str(float(pixel_array.max())),
+                'MeanValue': str(float(pixel_array.mean())),
+                'StdDeviation': str(float(pixel_array.std())),
+                'ImageHistogram': str(np.histogram(pixel_array, bins=256)[0].tolist())
+            }
+        except:
+            info['ImageStatistics'] = 'Not available'
+        
+    except Exception as e:
+        print(f"Error extracting DICOM info: {str(e)}")
     
     return info
 
@@ -175,17 +306,8 @@ def process_dicom_file(file_path, window_width=2000, window_center=1000):
         image.save(img_byte_arr, format='PNG')
         img_byte_arr.seek(0)
         
-        # Get DICOM metadata
-        metadata = {
-            'PatientName': str(getattr(ds, 'PatientName', 'N/A')),
-            'StudyDate': str(getattr(ds, 'StudyDate', 'N/A')),
-            'Modality': str(getattr(ds, 'Modality', 'N/A')),
-            'ImageSize': f"{pixel_array.shape[1]}x{pixel_array.shape[0]}",
-            'WindowWidth': str(getattr(ds, 'WindowWidth', 'N/A')),
-            'WindowCenter': str(getattr(ds, 'WindowCenter', 'N/A')),
-            'SeriesDescription': str(getattr(ds, 'SeriesDescription', 'N/A')),
-            'InstanceNumber': str(getattr(ds, 'InstanceNumber', 'N/A'))
-        }
+        # Get comprehensive DICOM metadata
+        metadata = get_dicom_info(file_path)
         
         return img_byte_arr, metadata
     except Exception as e:
@@ -322,6 +444,21 @@ def update_window_level():
             return send_file(img_data, mimetype='image/png')
         else:
             return jsonify({'success': False, 'error': 'Error processing image'}), 500
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/info/<int:index>')
+def show_info(index):
+    try:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], f'file_{index}.dcm')
+        if not os.path.exists(file_path):
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+        
+        # Get DICOM information
+        dicom_info = get_dicom_info(file_path)
+        
+        return render_template('info.html', dicom_info=dicom_info)
             
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

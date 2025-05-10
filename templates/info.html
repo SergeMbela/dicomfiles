@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM Information</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .info-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+        .info-section h3 {
+            color: #0d6efd;
+            margin-bottom: 15px;
+        }
+        .info-item {
+            margin-bottom: 8px;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .info-value {
+            color: #212529;
+        }
+        .histogram-container {
+            width: 100%;
+            height: 200px;
+            margin-top: 10px;
+        }
+        .back-button {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <button class="btn btn-primary back-button" onclick="window.location.href='/'">Back to Viewer</button>
+        
+        <h2 class="mb-4">DICOM Information</h2>
+        
+        <!-- Patient Information -->
+        <div class="info-section">
+            <h3>Patient Information</h3>
+            {% for key, value in dicom_info.PatientInfo.items() %}
+            <div class="info-item">
+                <span class="info-label">{{ key }}:</span>
+                <span class="info-value">{{ value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Study Information -->
+        <div class="info-section">
+            <h3>Study Information</h3>
+            {% for key, value in dicom_info.StudyInfo.items() %}
+            <div class="info-item">
+                <span class="info-label">{{ key }}:</span>
+                <span class="info-value">{{ value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Series Information -->
+        <div class="info-section">
+            <h3>Series Information</h3>
+            {% for key, value in dicom_info.SeriesInfo.items() %}
+            <div class="info-item">
+                <span class="info-label">{{ key }}:</span>
+                <span class="info-value">{{ value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Image Information -->
+        <div class="info-section">
+            <h3>Image Information</h3>
+            {% for key, value in dicom_info.ImageInfo.items() %}
+            <div class="info-item">
+                <span class="info-label">{{ key }}:</span>
+                <span class="info-value">{{ value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Window/Level Information -->
+        <div class="info-section">
+            <h3>Window/Level Information</h3>
+            {% for key, value in dicom_info.WindowLevelInfo.items() %}
+            <div class="info-item">
+                <span class="info-label">{{ key }}:</span>
+                <span class="info-value">{{ value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Technical Information -->
+        <div class="info-section">
+            <h3>Technical Information</h3>
+            {% for key, value in dicom_info.TechnicalInfo.items() %}
+            <div class="info-item">
+                <span class="info-label">{{ key }}:</span>
+                <span class="info-value">{{ value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Acquisition Information -->
+        <div class="info-section">
+            <h3>Acquisition Information</h3>
+            {% for key, value in dicom_info.AcquisitionInfo.items() %}
+            <div class="info-item">
+                <span class="info-label">{{ key }}:</span>
+                <span class="info-value">{{ value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Quality Information -->
+        <div class="info-section">
+            <h3>Quality Information</h3>
+            {% for key, value in dicom_info.QualityInfo.items() %}
+            <div class="info-item">
+                <span class="info-label">{{ key }}:</span>
+                <span class="info-value">{{ value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Image Statistics -->
+        <div class="info-section">
+            <h3>Image Statistics</h3>
+            {% if dicom_info.ImageStatistics != 'Not available' %}
+                {% for key, value in dicom_info.ImageStatistics.items() %}
+                <div class="info-item">
+                    <span class="info-label">{{ key }}:</span>
+                    <span class="info-value">{{ value }}</span>
+                </div>
+                {% endfor %}
+                <div class="histogram-container" id="histogram"></div>
+            {% else %}
+                <div class="info-item">
+                    <span class="info-value">Image statistics not available</span>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+        // Plot histogram if available
+        {% if dicom_info.ImageStatistics != 'Not available' %}
+            var histogramData = JSON.parse('{{ dicom_info.ImageStatistics.ImageHistogram | safe }}');
+            var x = Array.from({length: 256}, (_, i) => i);
+            
+            var trace = {
+                x: x,
+                y: histogramData,
+                type: 'bar',
+                name: 'Pixel Distribution'
+            };
+
+            var layout = {
+                title: 'Image Histogram',
+                xaxis: {
+                    title: 'Pixel Value'
+                },
+                yaxis: {
+                    title: 'Frequency'
+                }
+            };
+
+            Plotly.newPlot('histogram', [trace], layout);
+        {% endif %}
+    </script>
+</body>
+</html> 

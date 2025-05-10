@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DICOM Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -26,6 +28,7 @@
         .image-container {
             flex: 1;
             text-align: center;
+            position: relative;
         }
         .controls {
             width: 300px;
@@ -38,6 +41,7 @@
             height: auto;
             border: 1px solid #ddd;
             margin-bottom: 10px;
+            cursor: move;
         }
         .slider-container {
             margin: 15px 0;
@@ -52,22 +56,100 @@
         .file-upload {
             margin-bottom: 20px;
         }
-        button {
-            padding: 8px 16px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
         .nav-buttons {
             display: flex;
             gap: 10px;
             justify-content: center;
             margin-top: 10px;
+        }
+        .image-counter {
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+        .toolbar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px;
+            border-radius: 5px;
+            display: flex;
+            gap: 5px;
+        }
+        .toolbar button {
+            padding: 5px 10px;
+            border: none;
+            background: #007bff;
+            color: white;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .toolbar button:hover {
+            background: #0056b3;
+        }
+        .measurement-tools {
+            display: none;
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .measurement-tools.active {
+            display: block;
+        }
+        .preset-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .preset-button {
+            flex: 1;
+            min-width: 80px;
+            padding: 5px;
+            font-size: 0.8em;
+        }
+        .zoom-controls {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px;
+            border-radius: 5px;
+            display: flex;
+            gap: 5px;
+        }
+        .loading-overlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            justify-content: center;
+            align-items: center;
+        }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .measurement-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -77,44 +159,112 @@
         
         <div class="file-upload">
             <input type="file" id="dicomFile" accept=".dcm,.dicom" multiple>
-            <button onclick="uploadFiles()">Upload DICOM Files</button>
+            <button class="btn btn-primary" onclick="uploadFiles()">Upload DICOM Files</button>
         </div>
 
         <div class="viewer-container">
             <div class="image-container">
+                <div class="toolbar">
+                    <button onclick="toggleMeasurementTools()"><i class="fas fa-ruler"></i></button>
+                    <button onclick="resetView()"><i class="fas fa-sync"></i></button>
+                    <button onclick="toggleFullscreen()"><i class="fas fa-expand"></i></button>
+                </div>
+                
+                <div class="measurement-tools" id="measurementTools">
+                    <button onclick="startDistanceMeasurement()">Distance</button>
+                    <button onclick="startAreaMeasurement()">Area</button>
+                    <button onclick="startAngleMeasurement()">Angle</button>
+                    <button onclick="clearMeasurements()">Clear</button>
+                </div>
+                
+                <div class="zoom-controls">
+                    <button onclick="zoomIn()"><i class="fas fa-search-plus"></i></button>
+                    <button onclick="zoomOut()"><i class="fas fa-search-minus"></i></button>
+                    <button onclick="resetZoom()"><i class="fas fa-compress"></i></button>
+                </div>
+                
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="loading-spinner"></div>
+                </div>
+                
+                <canvas id="measurementCanvas" class="measurement-canvas"></canvas>
                 <img id="dicomImage" class="image-display" src="" alt="DICOM Image">
+                <div class="image-counter" id="image-counter">Image 0 of 0</div>
                 <div class="nav-buttons">
-                    <button onclick="previousImage()">Previous</button>
-                    <button onclick="nextImage()">Next</button>
+                    <button class="btn btn-primary" id="prev-image" onclick="previousImage()">Previous</button>
+                    <button class="btn btn-primary" id="next-image" onclick="nextImage()">Next</button>
                 </div>
             </div>
             
             <div class="controls">
                 <h3>Image Controls</h3>
                 <div class="slider-container">
-                    <label for="windowWidth">Window Width:</label>
-                    <input type="range" id="windowWidth" min="1" max="4000" value="2000" onchange="updateWindowLevel()">
-                    <span id="windowWidthValue">2000</span>
+                    <label for="window-width">Window Width:</label>
+                    <input type="range" id="window-width" min="1" max="4000" value="2000" onchange="updateWindowLevel()">
+                    <span id="window-width-value">2000</span>
                 </div>
                 
                 <div class="slider-container">
-                    <label for="windowCenter">Window Center:</label>
-                    <input type="range" id="windowCenter" min="-1000" max="3000" value="1000" onchange="updateWindowLevel()">
-                    <span id="windowCenterValue">1000</span>
+                    <label for="window-center">Window Center:</label>
+                    <input type="range" id="window-center" min="-1000" max="3000" value="1000" onchange="updateWindowLevel()">
+                    <span id="window-center-value">1000</span>
                 </div>
-
+                
                 <div class="slider-container">
                     <label for="rotation">Rotation:</label>
                     <input type="range" id="rotation" min="0" max="360" value="0" onchange="updateRotation()">
-                    <span id="rotationValue">0°</span>
+                    <span id="rotation-value">0°</span>
+                </div>
+                
+                <div class="preset-buttons">
+                    <button class="btn btn-secondary preset-button" onclick="applyPreset('lung')">Lung</button>
+                    <button class="btn btn-secondary preset-button" onclick="applyPreset('bone')">Bone</button>
+                    <button class="btn btn-secondary preset-button" onclick="applyPreset('brain')">Brain</button>
+                    <button class="btn btn-secondary preset-button" onclick="applyPreset('abdomen')">Abdomen</button>
+                </div>
+                
+                <div class="mt-3">
+                    <button id="view-info" class="btn btn-info w-100">View DICOM Info</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let currentImageIndex = 0;
         let uploadedFiles = [];
+        let currentZoom = 1;
+        let isPanning = false;
+        let startX, startY;
+        let translateX = 0;
+        let translateY = 0;
+        let isMeasuring = false;
+        let measurementType = null;
+        let measurementPoints = [];
+        let canvas, ctx;
+        let measurements = [];
+
+        // Initialize canvas
+        function initCanvas() {
+            canvas = document.getElementById('measurementCanvas');
+            ctx = canvas.getContext('2d');
+            resizeCanvas();
+        }
+
+        function resizeCanvas() {
+            const img = document.getElementById('dicomImage');
+            canvas.width = img.width;
+            canvas.height = img.height;
+        }
+
+        // Window/Level presets
+        const presets = {
+            lung: { width: 1500, center: -600 },
+            bone: { width: 2000, center: 400 },
+            brain: { width: 80, center: 40 },
+            abdomen: { width: 400, center: 40 }
+        };
 
         function uploadFiles() {
             const fileInput = document.getElementById('dicomFile');
@@ -125,6 +275,7 @@
                 return;
             }
 
+            showLoading();
             const formData = new FormData();
             for (let i = 0; i < files.length; i++) {
                 formData.append('files', files[i]);
@@ -139,47 +290,61 @@
                 if (data.success) {
                     uploadedFiles = data.files;
                     currentImageIndex = 0;
+                    updateImageCounter();
                     loadImage(currentImageIndex);
+                    updateNavigationButtons();
                 } else {
                     alert('Error uploading files: ' + data.error);
                 }
+                hideLoading();
             })
             .catch(error => {
                 console.error('Error:', error);
                 alert('Error uploading files');
+                hideLoading();
             });
         }
 
         function loadImage(index) {
             if (index >= 0 && index < uploadedFiles.length) {
+                showLoading();
                 const img = document.getElementById('dicomImage');
-                img.src = `/get_image/${index}?t=${new Date().getTime()}`;
+                const windowWidth = document.getElementById('window-width').value;
+                const windowCenter = document.getElementById('window-center').value;
+                const rotation = document.getElementById('rotation').value;
+                
+                img.src = `/get_image/${index}?window_width=${windowWidth}&window_center=${windowCenter}&rotation=${rotation}&t=${new Date().getTime()}`;
+                img.onload = () => {
+                    hideLoading();
+                    updateImageCounter();
+                    resizeCanvas();
+                    redrawMeasurements();
+                };
             }
         }
 
         function updateWindowLevel() {
-            const windowWidth = document.getElementById('windowWidth').value;
-            const windowCenter = document.getElementById('windowCenter').value;
+            const windowWidth = document.getElementById('window-width').value;
+            const windowCenter = document.getElementById('window-center').value;
             
-            document.getElementById('windowWidthValue').textContent = windowWidth;
-            document.getElementById('windowCenterValue').textContent = windowCenter;
+            document.getElementById('window-width-value').textContent = windowWidth;
+            document.getElementById('window-center-value').textContent = windowCenter;
 
-            const img = document.getElementById('dicomImage');
-            img.src = `/get_image/${currentImageIndex}?window_width=${windowWidth}&window_center=${windowCenter}&t=${new Date().getTime()}`;
+            loadImage(currentImageIndex);
         }
 
         function updateRotation() {
             const rotation = document.getElementById('rotation').value;
-            document.getElementById('rotationValue').textContent = rotation + '°';
+            document.getElementById('rotation-value').textContent = rotation + '°';
             
-            const img = document.getElementById('dicomImage');
-            img.src = `/get_image/${currentImageIndex}?rotation=${rotation}&t=${new Date().getTime()}`;
+            loadImage(currentImageIndex);
         }
 
         function previousImage() {
             if (currentImageIndex > 0) {
                 currentImageIndex--;
                 loadImage(currentImageIndex);
+                updateNavigationButtons();
             }
         }
 
@@ -187,8 +352,343 @@
             if (currentImageIndex < uploadedFiles.length - 1) {
                 currentImageIndex++;
                 loadImage(currentImageIndex);
+                updateNavigationButtons();
             }
         }
+
+        function updateImageCounter() {
+            const counter = document.getElementById('image-counter');
+            counter.textContent = `Image ${currentImageIndex + 1} of ${uploadedFiles.length}`;
+        }
+
+        function updateNavigationButtons() {
+            const prevButton = document.getElementById('prev-image');
+            const nextButton = document.getElementById('next-image');
+            
+            prevButton.disabled = currentImageIndex === 0;
+            nextButton.disabled = currentImageIndex === uploadedFiles.length - 1;
+        }
+
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function toggleMeasurementTools() {
+            const tools = document.getElementById('measurementTools');
+            tools.classList.toggle('active');
+        }
+
+        function startDistanceMeasurement() {
+            isMeasuring = true;
+            measurementType = 'distance';
+            measurementPoints = [];
+            canvas.style.pointerEvents = 'auto';
+            canvas.addEventListener('click', handleMeasurementClick);
+        }
+
+        function startAreaMeasurement() {
+            isMeasuring = true;
+            measurementType = 'area';
+            measurementPoints = [];
+            canvas.style.pointerEvents = 'auto';
+            canvas.addEventListener('click', handleMeasurementClick);
+        }
+
+        function startAngleMeasurement() {
+            isMeasuring = true;
+            measurementType = 'angle';
+            measurementPoints = [];
+            canvas.style.pointerEvents = 'auto';
+            canvas.addEventListener('click', handleMeasurementClick);
+        }
+
+        function handleMeasurementClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / currentZoom;
+            const y = (e.clientY - rect.top) / currentZoom;
+            
+            measurementPoints.push({ x, y });
+            
+            if (measurementType === 'distance' && measurementPoints.length === 2) {
+                drawDistanceMeasurement();
+                measurements.push({
+                    type: 'distance',
+                    points: [...measurementPoints]
+                });
+                finishMeasurement();
+            } else if (measurementType === 'area' && measurementPoints.length >= 3) {
+                drawAreaMeasurement();
+                measurements.push({
+                    type: 'area',
+                    points: [...measurementPoints]
+                });
+                finishMeasurement();
+            } else if (measurementType === 'angle' && measurementPoints.length === 3) {
+                drawAngleMeasurement();
+                measurements.push({
+                    type: 'angle',
+                    points: [...measurementPoints]
+                });
+                finishMeasurement();
+            } else {
+                drawMeasurementPreview();
+            }
+        }
+
+        function drawDistanceMeasurement() {
+            const [p1, p2] = measurementPoints;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw points
+            drawPoint(p1.x, p1.y);
+            drawPoint(p2.x, p2.y);
+            
+            // Calculate and display distance
+            const distance = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+            const midX = (p1.x + p2.x) / 2;
+            const midY = (p1.y + p2.y) / 2;
+            
+            ctx.fillStyle = '#00ff00';
+            ctx.font = '14px Arial';
+            ctx.fillText(`${distance.toFixed(2)}px`, midX, midY);
+        }
+
+        function drawAreaMeasurement() {
+            ctx.beginPath();
+            ctx.moveTo(measurementPoints[0].x, measurementPoints[0].y);
+            for (let i = 1; i < measurementPoints.length; i++) {
+                ctx.lineTo(measurementPoints[i].x, measurementPoints[i].y);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw points
+            measurementPoints.forEach(point => drawPoint(point.x, point.y));
+            
+            // Calculate and display area
+            const area = calculatePolygonArea(measurementPoints);
+            const center = calculatePolygonCenter(measurementPoints);
+            
+            ctx.fillStyle = '#00ff00';
+            ctx.font = '14px Arial';
+            ctx.fillText(`${area.toFixed(2)}px²`, center.x, center.y);
+        }
+
+        function drawAngleMeasurement() {
+            const [p1, p2, p3] = measurementPoints;
+            
+            // Draw lines
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.lineTo(p3.x, p3.y);
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw points
+            drawPoint(p1.x, p1.y);
+            drawPoint(p2.x, p2.y);
+            drawPoint(p3.x, p3.y);
+            
+            // Calculate and display angle
+            const angle = calculateAngle(p1, p2, p3);
+            ctx.fillStyle = '#00ff00';
+            ctx.font = '14px Arial';
+            ctx.fillText(`${angle.toFixed(1)}°`, p2.x, p2.y - 10);
+        }
+
+        function drawMeasurementPreview() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            redrawMeasurements();
+            
+            if (measurementPoints.length > 0) {
+                const lastPoint = measurementPoints[measurementPoints.length - 1];
+                const mousePos = getMousePosition();
+                
+                ctx.beginPath();
+                ctx.moveTo(lastPoint.x, lastPoint.y);
+                ctx.lineTo(mousePos.x, mousePos.y);
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+
+        function drawPoint(x, y) {
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, 2 * Math.PI);
+            ctx.fillStyle = '#00ff00';
+            ctx.fill();
+        }
+
+        function calculatePolygonArea(points) {
+            let area = 0;
+            for (let i = 0; i < points.length; i++) {
+                const j = (i + 1) % points.length;
+                area += points[i].x * points[j].y;
+                area -= points[j].x * points[i].y;
+            }
+            return Math.abs(area / 2);
+        }
+
+        function calculatePolygonCenter(points) {
+            let x = 0, y = 0;
+            points.forEach(point => {
+                x += point.x;
+                y += point.y;
+            });
+            return {
+                x: x / points.length,
+                y: y / points.length
+            };
+        }
+
+        function calculateAngle(p1, p2, p3) {
+            const v1 = { x: p1.x - p2.x, y: p1.y - p2.y };
+            const v2 = { x: p3.x - p2.x, y: p3.y - p2.y };
+            
+            const dot = v1.x * v2.x + v1.y * v2.y;
+            const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+            const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+            
+            const cos = dot / (mag1 * mag2);
+            const angle = Math.acos(Math.max(-1, Math.min(1, cos)));
+            return angle * (180 / Math.PI);
+        }
+
+        function getMousePosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: (e.clientX - rect.left) / currentZoom,
+                y: (e.clientY - rect.top) / currentZoom
+            };
+        }
+
+        function finishMeasurement() {
+            isMeasuring = false;
+            measurementType = null;
+            measurementPoints = [];
+            canvas.style.pointerEvents = 'none';
+            canvas.removeEventListener('click', handleMeasurementClick);
+        }
+
+        function clearMeasurements() {
+            measurements = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function redrawMeasurements() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            measurements.forEach(measurement => {
+                if (measurement.type === 'distance') {
+                    measurementPoints = measurement.points;
+                    drawDistanceMeasurement();
+                } else if (measurement.type === 'area') {
+                    measurementPoints = measurement.points;
+                    drawAreaMeasurement();
+                } else if (measurement.type === 'angle') {
+                    measurementPoints = measurement.points;
+                    drawAngleMeasurement();
+                }
+            });
+        }
+
+        function applyPreset(presetName) {
+            const preset = presets[presetName];
+            if (preset) {
+                document.getElementById('window-width').value = preset.width;
+                document.getElementById('window-center').value = preset.center;
+                updateWindowLevel();
+            }
+        }
+
+        function zoomIn() {
+            currentZoom *= 1.2;
+            updateZoom();
+        }
+
+        function zoomOut() {
+            currentZoom /= 1.2;
+            updateZoom();
+        }
+
+        function resetZoom() {
+            currentZoom = 1;
+            translateX = 0;
+            translateY = 0;
+            updateZoom();
+        }
+
+        function updateZoom() {
+            const img = document.getElementById('dicomImage');
+            img.style.transform = `scale(${currentZoom}) translate(${translateX}px, ${translateY}px)`;
+        }
+
+        function resetView() {
+            resetZoom();
+            document.getElementById('rotation').value = 0;
+            document.getElementById('window-width').value = 2000;
+            document.getElementById('window-center').value = 1000;
+            updateRotation();
+            updateWindowLevel();
+        }
+
+        function toggleFullscreen() {
+            const container = document.querySelector('.image-container');
+            if (!document.fullscreenElement) {
+                container.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Add event listeners for panning
+        document.getElementById('dicomImage').addEventListener('mousedown', (e) => {
+            if (currentZoom > 1) {
+                isPanning = true;
+                startX = e.clientX - translateX;
+                startY = e.clientY - translateY;
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isPanning) {
+                translateX = e.clientX - startX;
+                translateY = e.clientY - startY;
+                updateZoom();
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isPanning = false;
+        });
+
+        // Add event listener for the info button
+        document.getElementById('view-info').addEventListener('click', function() {
+            if (uploadedFiles.length > 0) {
+                window.open(`/info/${currentImageIndex}`, '_blank');
+            } else {
+                alert('Please upload DICOM files first');
+            }
+        });
+
+        // Initialize buttons as disabled
+        updateNavigationButtons();
+
+        // Initialize canvas when the page loads
+        window.addEventListener('load', initCanvas);
     </script>
 </body>
 </html> 
